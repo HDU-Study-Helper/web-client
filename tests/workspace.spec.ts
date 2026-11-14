@@ -1,0 +1,86 @@
+import { test, expect } from '@playwright/test'
+
+test('本地预览不请求 API，主页与对话始终并列，切换入口保留消息', async ({ page }) => {
+  const requests: string[] = []
+  const errors: string[] = []
+  page.on('request', (request) => {
+    if (/\/api\/|\/admin/.test(request.url())) requests.push(request.url())
+  })
+  page.on('pageerror', (error) => errors.push(error.message))
+  page.on('console', (message) => {
+    if (message.type() === 'error') errors.push(message.text())
+  })
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.goto('/?demo=1')
+  const dashboard = page.locator('#dashboard')
+  const assistant = page.getByRole('region', { name: 'Academic Assistant 对话区域' })
+  await expect(dashboard).toBeVisible()
+  await expect(assistant).toBeVisible()
+  const left = (await dashboard.boundingBox())!
+  const right = (await assistant.boundingBox())!
+  expect(left.x + left.width).toBeLessThan(right.x)
+  await page.getByRole('button', { name: '对话', exact: true }).click()
+  await expect(page.getByRole('textbox', { name: '向学习助手提问' })).toBeFocused()
+  await expect(dashboard).toBeVisible()
+  await page.getByRole('button', { name: '这周有哪些作业要交？' }).click()
+  await expect(page.getByRole('log')).toContainText('我这周有哪些作业和截止日期？')
+  await expect(page.getByRole('log')).toContainText('你有 3 项待完成任务')
+  await page.getByRole('button', { name: '日程', exact: true }).click()
+  await expect(page.getByRole('heading', { name: '给每一天，一点秩序。' })).toBeVisible()
+  await page.getByRole('button', { name: '11.13 / 周五' }).click()
+  await expect(page.getByRole('heading', { name: '这一天，还留有空白。' })).toBeVisible()
+  await page.getByRole('button', { name: '主页', exact: true }).click()
+  await expect(page.getByRole('log')).toContainText('你有 3 项待完成任务')
+  await expect(dashboard).toBeVisible()
+  const input = page.getByRole('textbox', { name: '向学习助手提问' })
+  await input.fill('我最近的学习进度怎么样？')
+  await input.press('Enter')
+  await expect(page.getByRole('log')).toContainText('高等数学  65%')
+  await page.getByRole('button', { name: '新对话' }).click()
+  await expect(page.getByRole('log')).toHaveCount(0)
+  await expect(page.getByText('留一点空间，给新的想法。')).toBeVisible()
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(1440)
+  expect(requests).toEqual([])
+  expect(errors).toEqual([])
+})
+
+test('课程详情与全部课程、本地偏好和输入校验', async ({ page }) => {
+  await page.goto('/?demo=1')
+  await expect(page.getByRole('button', { name: '发送消息' })).toBeDisabled()
+  await page.getByRole('textbox', { name: '向学习助手提问' }).fill('   ')
+  await expect(page.getByRole('button', { name: '发送消息' })).toBeDisabled()
+  await page.getByRole('button', { name: '查看全部 5 门课程' }).click()
+  await expect(page.getByRole('button', { name: '查看程序设计基础详情' })).toBeVisible()
+  await page.getByRole('button', { name: '查看待办详情' }).click()
+  await expect(page.getByRole('dialog')).toContainText('组合体三视图')
+  await page.getByRole('button', { name: '和助手一起安排' }).click()
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  await expect(page.getByRole('log')).toContainText('帮我安排工程制图的作业 2任务。')
+  await expect(page.getByRole('log')).toContainText('你有 3 项待完成任务')
+  await page.getByRole('button', { name: '我的', exact: true }).click()
+  await page.getByRole('switch', { name: '学业提醒' }).click()
+  await expect(page.getByRole('switch', { name: '学业提醒' })).not.toBeChecked()
+  await page.getByRole('button', { name: '主页', exact: true }).click()
+  await expect(page.getByRole('heading', { name: '学业提醒已暂停' })).toBeVisible()
+})
+
+test('左右独立滚动，输入框保持可见，手机布局无横向溢出', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 720 })
+  await page.goto('/?demo=1')
+  await page.getByRole('button', { name: '查看全部 5 门课程' }).click()
+  const dashboard = page.locator('#dashboard')
+  const input = page.getByRole('textbox', { name: '向学习助手提问' })
+  const inputPosition = (await input.boundingBox())!
+  await dashboard.evaluate((el) => {
+    el.scrollTop = el.scrollHeight
+  })
+  expect((await input.boundingBox())!.y).toBe(inputPosition.y)
+  await input.fill('帮我总结一下高等数学的重点。')
+  await page.getByRole('button', { name: '发送消息' }).click()
+  await expect(page.getByRole('log')).toContainText('拉格朗日中值定理')
+  expect((await input.boundingBox())!.y).toBe(inputPosition.y)
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.getByRole('button', { name: '对话', exact: true }).click()
+  await expect(input).toBeFocused()
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+})
