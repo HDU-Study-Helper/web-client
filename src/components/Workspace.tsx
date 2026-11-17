@@ -1,4 +1,13 @@
-import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type FormEvent,
+  type PointerEvent as ReactPointerEvent,
+  type ReactNode,
+} from 'react'
 import {
   ArrowLeft,
   ArrowRight,
@@ -11,16 +20,17 @@ import {
   ClipboardCheck,
   Clock3,
   CornerDownLeft,
+  GripHorizontal,
   House,
   Layers3,
   LogOut,
-  MessageCircle,
   Plus,
   Send,
   Settings2,
   Target,
   TrendingUp,
   UserRound,
+  X,
 } from 'lucide-react'
 import type { User } from '../types'
 import {
@@ -38,21 +48,22 @@ import PixelComputer from './PixelComputer'
 import { Brand, Modal, Notice } from './UI'
 import '../workspace.css'
 
-type Page = 'home' | 'chat' | 'schedule' | 'profile'
+type Page = 'home' | 'schedule' | 'profile'
 type Message = { id: number; role: 'user' | 'assistant'; text: string; sources?: string[] }
+type ChatAnchor = { x: number; y: number }
+type ChatMorph = { launcherWidth: number; launcherHeight: number; panelWidth: number; panelHeight: number }
+type DragState = { pointerId: number; offsetX: number; offsetY: number }
+type LauncherDragState = DragState & { startX: number; startY: number; moved: boolean }
 const questionIcons = { calendar: CalendarDays, book: BookOpen, trend: TrendingUp, target: Target }
 const navigation = [
   { id: 'home', label: '主页', icon: House },
-  { id: 'chat', label: '对话', icon: MessageCircle },
   { id: 'schedule', label: '日程', icon: CalendarDays },
   { id: 'profile', label: '我的', icon: UserRound },
 ] as const
 
 function Module({
-  number,
   title,
   subtitle,
-  label,
   children,
   className = '',
   action,
@@ -69,11 +80,10 @@ function Module({
     <section className={`study-module ${className}`}>
       <header className="module-heading">
         <h2>
-          <span className="module-index">{number}</span>
           <span className="pixel-type">{title}</span>
           <span className="module-subtitle">{subtitle}</span>
         </h2>
-        {action || <span className="module-label">// {label}</span>}
+        {action}
       </header>
       {children}
     </section>
@@ -120,11 +130,23 @@ export default function Workspace({
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [replying, setReplying] = useState(false)
+  const [chatOpen, setChatOpen] = useState(false)
+  const [chatClosing, setChatClosing] = useState(false)
+  const [chatReady, setChatReady] = useState(false)
+  const [chatMorph, setChatMorph] = useState<ChatMorph>()
+  const [chatAnchor, setChatAnchor] = useState<ChatAnchor>()
   const [notice, setNotice] = useState('')
   const [reminders, setReminders] = useState(true)
   const [selectedDay, setSelectedDay] = useState(0)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const conversationRef = useRef<HTMLDivElement>(null)
+  const chatWindowRef = useRef<HTMLElement>(null)
+  const chatLauncherRef = useRef<HTMLButtonElement>(null)
+  const restoreChatFocus = useRef(false)
+  const suppressLauncherClick = useRef(false)
+  const dragState = useRef<DragState | undefined>(undefined)
+  const launcherDragState = useRef<LauncherDragState | undefined>(undefined)
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const replyTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const pendingReply = useRef(false)
   const nextId = useRef(0)
@@ -152,20 +174,222 @@ export default function Workspace({
     const timer = setInterval(() => setClock(new Date()), 30_000)
     return () => {
       clearInterval(timer)
+      clearTimeout(closeTimer.current)
       clearTimeout(replyTimer.current)
     }
   }, [])
   useEffect(() => {
     const el = conversationRef.current
     if (el) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
-  }, [messages, replying, page])
+  }, [messages, replying, chatOpen])
+  useLayoutEffect(() => {
+    if (!chatOpen) return
+    const launcher = chatLauncherRef.current
+    const panel = chatWindowRef.current
+    if (!launcher || !panel) return
+    const launcherRect = launcher.getBoundingClientRect()
+    setChatMorph({
+      launcherWidth: launcherRect.width,
+      launcherHeight: launcherRect.height,
+      panelWidth: panel.offsetWidth,
+      panelHeight: panel.offsetHeight,
+    })
+  }, [chatOpen, chatAnchor])
   useEffect(() => {
-    if (page === 'chat') inputRef.current?.focus({ preventScroll: true })
-  }, [page])
+    if (!chatOpen) {
+      if (!restoreChatFocus.current) return
+      restoreChatFocus.current = false
+      const frame = requestAnimationFrame(() => chatLauncherRef.current?.focus())
+      return () => cancelAnimationFrame(frame)
+    }
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    let revealTimer: ReturnType<typeof setTimeout> | undefined
+    let focusTimer: ReturnType<typeof setTimeout> | undefined
+    if (reduceMotion) {
+      setChatReady(true)
+      inputRef.current?.focus({ preventScroll: true })
+    } else {
+      revealTimer = setTimeout(() => setChatReady(true), 520)
+      focusTimer = setTimeout(() => inputRef.current?.focus({ preventScroll: true }), 700)
+    }
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') closeChat()
+    }
+    window.addEventListener('keydown', closeOnEscape)
+    return () => {
+      clearTimeout(revealTimer)
+      clearTimeout(focusTimer)
+      window.removeEventListener('keydown', closeOnEscape)
+    }
+  }, [chatOpen])
+  useEffect(() => {
+    if (!chatOpen) return
+    const closeOnOutsidePointer = (event: PointerEvent) => {
+      if (window.matchMedia('(max-width: 760px)').matches) return
+      const target = event.target
+      if (!(target instanceof Node) || chatWindowRef.current?.contains(target)) return
+      closeChat()
+    }
+    document.addEventListener('pointerdown', closeOnOutsidePointer)
+    return () => document.removeEventListener('pointerdown', closeOnOutsidePointer)
+  }, [chatOpen, chatClosing])
+  useEffect(() => {
+    if (!chatOpen) return
+    const viewport = window.visualViewport
+    const panel = chatWindowRef.current
+    if (!viewport || !panel) return
+    const updateVisualViewport = () => {
+      panel.style.setProperty('--chat-viewport-height', `${viewport.height}px`)
+      panel.style.setProperty('--chat-viewport-top', `${viewport.offsetTop}px`)
+      if (document.activeElement === inputRef.current) {
+        requestAnimationFrame(() => inputRef.current?.scrollIntoView({ block: 'nearest' }))
+      }
+    }
+    updateVisualViewport()
+    viewport.addEventListener('resize', updateVisualViewport)
+    viewport.addEventListener('scroll', updateVisualViewport)
+    return () => {
+      viewport.removeEventListener('resize', updateVisualViewport)
+      viewport.removeEventListener('scroll', updateVisualViewport)
+    }
+  }, [chatOpen])
+  useEffect(() => {
+    if (!chatAnchor) return
+    const keepInViewport = () => {
+      const panel = chatWindowRef.current
+      const launcher = chatLauncherRef.current
+      const width = chatOpen && panel ? panel.offsetWidth : launcher?.offsetWidth || 64
+      const height = chatOpen && panel ? panel.offsetHeight : launcher?.offsetHeight || 58
+      setChatAnchor((current) => {
+        if (!current) return current
+        const next = {
+          x: Math.min(Math.max(width + 12, current.x), window.innerWidth - 12),
+          y: Math.min(Math.max(height + 12, current.y), window.innerHeight - 12),
+        }
+        return next.x === current.x && next.y === current.y ? current : next
+      })
+    }
+    window.addEventListener('resize', keepInViewport)
+    return () => window.removeEventListener('resize', keepInViewport)
+  }, [chatOpen, chatAnchor])
 
   function navigate(next: Page) {
     setPage(next)
-    if (next === 'chat') inputRef.current?.focus({ preventScroll: true })
+  }
+  function openChat() {
+    clearTimeout(closeTimer.current)
+    setChatClosing(false)
+    setChatReady(false)
+    setChatMorph(undefined)
+    if (!chatAnchor) {
+      const launcher = chatLauncherRef.current
+      const rect = launcher?.getBoundingClientRect()
+      if (rect) setChatAnchor({ x: rect.right, y: rect.bottom })
+    }
+    setChatOpen(true)
+  }
+  function closeChat() {
+    if (chatClosing) return
+    const launcher = chatLauncherRef.current
+    const panel = chatWindowRef.current
+    if (launcher && panel) {
+      const launcherRect = launcher.getBoundingClientRect()
+      setChatMorph({
+        launcherWidth: launcherRect.width,
+        launcherHeight: launcherRect.height,
+        panelWidth: panel.offsetWidth,
+        panelHeight: panel.offsetHeight,
+      })
+    }
+    dragState.current = undefined
+    restoreChatFocus.current = true
+    setChatReady(false)
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      setChatOpen(false)
+      return
+    }
+    setChatClosing(true)
+    closeTimer.current = setTimeout(() => {
+      setChatOpen(false)
+      setChatClosing(false)
+      setChatMorph(undefined)
+    }, 440)
+  }
+  function startLauncherDrag(event: ReactPointerEvent<HTMLButtonElement>) {
+    if (event.button !== 0 || chatOpen) return
+    const launcher = chatLauncherRef.current
+    if (!launcher) return
+    const rect = launcher.getBoundingClientRect()
+    launcherDragState.current = {
+      pointerId: event.pointerId,
+      offsetX: event.clientX - rect.left,
+      offsetY: event.clientY - rect.top,
+      startX: event.clientX,
+      startY: event.clientY,
+      moved: false,
+    }
+    event.currentTarget.setPointerCapture(event.pointerId)
+  }
+  function moveLauncher(event: ReactPointerEvent<HTMLButtonElement>) {
+    const drag = launcherDragState.current
+    const launcher = chatLauncherRef.current
+    if (!drag || drag.pointerId !== event.pointerId || !launcher) return
+    const moved = Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY) > 4
+    if (moved) drag.moved = true
+    const left = Math.min(
+      Math.max(12, event.clientX - drag.offsetX),
+      window.innerWidth - launcher.offsetWidth - 12,
+    )
+    const top = Math.min(
+      Math.max(12, event.clientY - drag.offsetY),
+      window.innerHeight - launcher.offsetHeight - 12,
+    )
+    setChatAnchor({ x: left + launcher.offsetWidth, y: top + launcher.offsetHeight })
+  }
+  function endLauncherDrag(event: ReactPointerEvent<HTMLButtonElement>) {
+    const drag = launcherDragState.current
+    if (!drag || drag.pointerId !== event.pointerId) return
+    suppressLauncherClick.current = drag.moved
+    if (drag.moved) setTimeout(() => (suppressLauncherClick.current = false), 0)
+    launcherDragState.current = undefined
+    if (event.currentTarget.hasPointerCapture(event.pointerId))
+      event.currentTarget.releasePointerCapture(event.pointerId)
+  }
+  function activateLauncher() {
+    if (suppressLauncherClick.current) {
+      suppressLauncherClick.current = false
+      return
+    }
+    openChat()
+  }
+  function startChatDrag(event: ReactPointerEvent<HTMLElement>) {
+    if (event.button !== 0 || window.matchMedia('(max-width: 760px)').matches) return
+    const panel = chatWindowRef.current
+    if (!panel) return
+    const rect = panel.getBoundingClientRect()
+    dragState.current = {
+      pointerId: event.pointerId,
+      offsetX: event.clientX - rect.left,
+      offsetY: event.clientY - rect.top,
+    }
+    setChatAnchor({ x: rect.right, y: rect.bottom })
+    event.currentTarget.setPointerCapture(event.pointerId)
+  }
+  function moveChat(event: ReactPointerEvent<HTMLElement>) {
+    const drag = dragState.current
+    const panel = chatWindowRef.current
+    if (!drag || drag.pointerId !== event.pointerId || !panel) return
+    const maxX = Math.max(12, window.innerWidth - panel.offsetWidth - 12)
+    const maxY = Math.max(12, window.innerHeight - panel.offsetHeight - 12)
+    const x = Math.min(Math.max(12, event.clientX - drag.offsetX), maxX)
+    const y = Math.min(Math.max(12, event.clientY - drag.offsetY), maxY)
+    setChatAnchor({ x: x + panel.offsetWidth, y: y + panel.offsetHeight })
+  }
+  function endChatDrag(event: ReactPointerEvent<HTMLElement>) {
+    if (dragState.current?.pointerId !== event.pointerId) return
+    dragState.current = undefined
+    if (event.currentTarget.hasPointerCapture(event.pointerId))
+      event.currentTarget.releasePointerCapture(event.pointerId)
   }
   function send(text: string) {
     const value = text.trim()
@@ -206,9 +430,6 @@ export default function Workspace({
           aria-label="Academic Assistant 主页"
         >
           <Brand small />
-          <span className="os-version">
-            v0.1 <span>Study OS</span>
-          </span>
         </button>
         <nav className="os-navigation" aria-label="主导航">
           {navigation.map(({ id, label, icon: Icon }) => (
@@ -228,47 +449,30 @@ export default function Workspace({
             <i />
             系统就绪
           </span>
-          <span className="os-clock">
-            <span>
-              {clock
-                .toLocaleDateString('en-CA', {
-                  month: '2-digit',
-                  day: '2-digit',
-                  timeZone: 'Asia/Shanghai',
-                })
-                .replace('/', '-')}
-            </span>
-            <time>{time}</time>
-          </span>
         </div>
       </header>
 
       <div className="workspace-meta">
+        <strong>本地示例数据</strong>
         <span>
-          <span className="status-square" /> PERSONAL ACADEMIC WORKSTATION
-        </span>
-        <span>
-          本地示例 <span className="meta-divider">/</span> {academicSnapshot.semester}{' '}
-          <span className="meta-divider">/</span> {academicSnapshot.week}
+          {academicSnapshot.semester} <span className="meta-divider">/</span> {academicSnapshot.week}
         </span>
       </div>
-      <main className={`workspace-main ${page === 'home' || page === 'chat' ? '' : 'single-view'}`}>
-        <div
-          className="dashboard-scroll"
-          id="dashboard"
-          tabIndex={-1}
-          hidden={page !== 'home' && page !== 'chat'}
-        >
+      <main className={`workspace-main ${page === 'home' ? '' : 'single-view'}`}>
+        <div className="dashboard-scroll" id="dashboard" tabIndex={-1} hidden={page !== 'home'}>
           <section className="welcome-panel">
             <PixelComputer />
             <div className="welcome-copy">
-              <span className="welcome-kicker">A NEW DAY, A LITTLE PROGRESS.</span>
               <h1 className="pixel-type">
                 {greeting}, {name.toUpperCase()}!<span className="cursor-block" />
               </h1>
-              <p>
-                今天是 {date} <span>·</span> 你的学业概览
-              </p>
+              <div className="welcome-datetime">
+                <span>今天是 {date}</span>
+                <span className="welcome-time-divider">·</span>
+                <time dateTime={clock.toISOString()}>{time}</time>
+                <span className="welcome-time-zone">北京时间</span>
+              </div>
+              <p>你的学业概览</p>
             </div>
             <svg className="mountain-art" viewBox="0 0 300 130" aria-hidden="true">
               <defs>
@@ -424,32 +628,67 @@ export default function Workspace({
               <ChevronDown size={13} className={expanded ? 'rotate' : ''} />
             </button>
           </Module>
-          <p className="dashboard-end">
-            <span>✦</span> 学习不必匆忙，每一步都算数。<span className="mono">END OF OVERVIEW</span>
-          </p>
         </div>
 
-        <section
-          className="assistant-console"
-          aria-label="Academic Assistant 对话区域"
-          hidden={page !== 'home' && page !== 'chat'}
-        >
-          <header className="console-heading">
+        {chatOpen && chatMorph && (!chatReady || chatClosing) && (
+          <span
+            className={`chat-morph-shell ${chatClosing ? 'is-closing' : ''}`}
+            aria-hidden="true"
+            style={
+              {
+                '--morph-from-width': `${chatMorph.launcherWidth}px`,
+                '--morph-from-height': `${chatMorph.launcherHeight}px`,
+                '--morph-to-width': `${chatMorph.panelWidth}px`,
+                '--morph-to-height': `${chatMorph.panelHeight}px`,
+                right: chatAnchor ? window.innerWidth - chatAnchor.x : undefined,
+                bottom: chatAnchor ? window.innerHeight - chatAnchor.y : undefined,
+              } as CSSProperties
+            }
+          />
+        )}
+        {chatOpen && (
+          <section
+            ref={chatWindowRef}
+            id="assistant-chat-window"
+            className={`assistant-console chat-window ${chatReady ? 'is-ready' : ''} ${chatClosing ? 'is-closing' : ''}`}
+            aria-label="Academic Assistant 对话区域"
+            style={
+              chatAnchor
+                ? {
+                    right: window.innerWidth - chatAnchor.x,
+                    bottom: window.innerHeight - chatAnchor.y,
+                  }
+                : undefined
+            }
+          >
+          <header
+            className="console-heading chat-window-handle"
+            onPointerDown={startChatDrag}
+            onPointerMove={moveChat}
+            onPointerUp={endChatDrag}
+            onPointerCancel={endChatDrag}
+          >
+            <GripHorizontal className="chat-drag-icon" size={18} aria-hidden="true" />
             <span className="console-prompt">›_</span>
             <h2 className="pixel-type">
               ACADEMIC ASSISTANT <span>学习助手</span>
             </h2>
-            <span className="console-status">
-              <i />
-              READY
-            </span>
+
+            <button
+              type="button"
+              className="chat-close-button"
+              aria-label="关闭学习助手"
+              onPointerDown={(event) => event.stopPropagation()}
+              onClick={closeChat}
+            >
+              <X size={18} />
+            </button>
           </header>
           <div className="conversation-scroll" ref={conversationRef}>
             <div className={`assistant-onboarding ${messages.length ? 'compact' : ''}`}>
               <div className="assistant-greeting">
                 <PixelComputer happy />
                 <div className="greeting-bubble">
-                  <span className="assistant-label">YOUR ACADEMIC COMPANION</span>
                   <h3 className="pixel-type">{chatCopy.welcome}</h3>
                   <p>{academicSnapshot.assistantIntro}</p>
                 </div>
@@ -458,7 +697,6 @@ export default function Workspace({
                 <div className="suggested-heading">
                   <span className="question-mark">?</span>
                   <h3>不妨，从这里开始</h3>
-                  <span>TRY ASKING</span>
                 </div>
                 <div className="suggested-grid">
                   {suggestedQuestions.map((q) => {
@@ -474,13 +712,7 @@ export default function Workspace({
                 </div>
               </div>
             </div>
-            {messages.length === 0 ? (
-              <div className="console-idle" aria-hidden="true">
-                <div className="idle-spark">✳</div>
-                <p>留一点空间，给新的想法。</p>
-                <span className="mono">LESS NOISE. MORE FOCUS.</span>
-              </div>
-            ) : (
+            {messages.length > 0 && (
               <div
                 className="message-list"
                 role="log"
@@ -556,7 +788,13 @@ export default function Workspace({
                 value={input}
                 onChange={(event) => setInput(event.target.value)}
                 onKeyDown={(event) => {
-                  if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
+                  const mobile = window.matchMedia('(max-width: 760px)').matches
+                  if (
+                    !mobile &&
+                    event.key === 'Enter' &&
+                    !event.shiftKey &&
+                    !event.nativeEvent.isComposing
+                  ) {
                     event.preventDefault()
                     send(input)
                   }
@@ -571,24 +809,25 @@ export default function Workspace({
                 <Send size={22} strokeWidth={1.5} />
               </button>
             </form>
-            <div className="composer-hint">
+            <div className="composer-hint composer-hint-desktop">
               <span>{chatCopy.note}</span>
               <span>
-                <CornerDownLeft size={11} /> 发送 <span className="tool-divider">·</span> Shift +
-                Enter 换行
+                <CornerDownLeft size={11} /> Enter 发送 <span className="tool-divider">·</span>{' '}
+                Shift + Enter 换行
               </span>
+            </div>
+            <div className="composer-hint composer-hint-mobile">
+              <span>{chatCopy.note}</span>
+              <span>点击发送按钮发送 · 回车换行</span>
             </div>
           </div>
         </section>
+        )}
 
         {page === 'schedule' && (
           <section className="standalone-page">
             <header className="standalone-title">
-              <div>
-                <span className="eyebrow">05 / MY SCHEDULE</span>
-                <h1 className="pixel-type">给每一天，一点秩序。</h1>
-                <p>把课堂与自己的时间，都安排妥当。</p>
-              </div>
+              <h1 className="pixel-type">日程</h1>
               <span className="local-page-badge">本地示例</span>
             </header>
             <div className="schedule-dates">
@@ -615,8 +854,7 @@ export default function Workspace({
                 </div>
               )}
             </Module>
-            <p className="standalone-note">日程为本地示例，仅用于展示。真实课表暂未接入。</p>
-            <button className="button button-secondary" onClick={() => navigate('home')}>
+            <button className="button button-secondary standalone-action" onClick={() => navigate('home')}>
               <ArrowLeft size={15} />
               返回工作台
             </button>
@@ -625,11 +863,7 @@ export default function Workspace({
         {page === 'profile' && (
           <section className="standalone-page profile-page">
             <header className="standalone-title">
-              <div>
-                <span className="eyebrow">06 / MY SPACE</span>
-                <h1 className="pixel-type">你的专属学习空间。</h1>
-                <p>按自己的节奏，慢慢来。</p>
-              </div>
+              <h1 className="pixel-type">我的</h1>
               <span className="local-page-badge">本地示例</span>
             </header>
             <div className="profile-card">
@@ -692,17 +926,31 @@ export default function Workspace({
           </section>
         )}
       </main>
-      <footer className="os-footer">
-        <span>
-          <span className="status-square" />
-          {preview ? 'LOCAL PREVIEW' : 'STUDY WORKSPACE'} <span className="footer-dot">·</span>{' '}
-          数据仅作展示
+      <button
+        ref={chatLauncherRef}
+        type="button"
+        className={`assistant-launcher ${chatOpen ? 'is-transforming' : ''} ${chatClosing ? 'is-returning' : ''}`}
+        aria-label={chatOpen ? '学习助手已打开' : '打开学习助手'}
+        aria-expanded={chatOpen}
+        aria-controls="assistant-chat-window"
+        style={
+          chatAnchor
+            ? { right: window.innerWidth - chatAnchor.x, bottom: window.innerHeight - chatAnchor.y }
+            : undefined
+        }
+        onPointerDown={startLauncherDrag}
+        onPointerMove={moveLauncher}
+        onPointerUp={endLauncherDrag}
+        onPointerCancel={endLauncherDrag}
+        onClick={activateLauncher}
+        disabled={chatOpen}
+      >
+        <span className="assistant-launcher-icon" aria-hidden="true">
+          <PixelComputer happy />
         </span>
-        <span>
-          DESIGNED FOR A LITTLE MORE CLARITY.<span className="footer-dot">✦</span>
-          <span>ACADEMIC ASSISTANT © 2026</span>
-        </span>
-      </footer>
+        <span className="assistant-launcher-label">学习助手</span>
+        {!!messages.length && <span className="assistant-launcher-count">{messages.length}</span>}
+      </button>
       {course && (
         <Modal title={`${course.name} / ${course.task}`} onClose={() => setCourse(undefined)}>
           <div className="course-detail">
@@ -737,7 +985,7 @@ export default function Workspace({
               className="button button-primary"
               onClick={() => {
                 setCourse(undefined)
-                navigate('chat')
+                openChat()
                 send(`帮我安排${course.name}的${course.task}任务。`)
               }}
             >

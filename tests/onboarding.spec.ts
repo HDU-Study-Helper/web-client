@@ -1,4 +1,39 @@
-import { test, expect, type Page, type Route } from '@playwright/test'
+import { test, expect, type Locator, type Page, type Route } from '@playwright/test'
+
+async function expectFontSize(locator: Locator, minimum = 12) {
+  const size = await locator.evaluate((element) => Number.parseFloat(getComputedStyle(element).fontSize))
+  expect(size).toBeGreaterThanOrEqual(minimum)
+}
+
+async function expectTextContrast(locator: Locator, minimum = 4.5) {
+  const ratio = await locator.evaluate((element) => {
+    const channels = (value: string) => value.match(/[\d.]+/g)?.slice(0, 3).map(Number) ?? []
+    const luminance = (value: string) => {
+      const rgb = channels(value).map((channel) => {
+        const normalized = channel / 255
+        return normalized <= 0.04045
+          ? normalized / 12.92
+          : ((normalized + 0.055) / 1.055) ** 2.4
+      })
+      return 0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2]
+    }
+    const foreground = getComputedStyle(element).color
+    let current: Element | null = element
+    let background = 'rgb(255, 255, 255)'
+    while (current) {
+      const candidate = getComputedStyle(current).backgroundColor
+      if (!candidate.endsWith(', 0)') && candidate !== 'transparent') {
+        background = candidate
+        break
+      }
+      current = current.parentElement
+    }
+    const light = Math.max(luminance(foreground), luminance(background))
+    const dark = Math.min(luminance(foreground), luminance(background))
+    return (light + 0.05) / (dark + 0.05)
+  })
+  expect(ratio).toBeGreaterThanOrEqual(minimum)
+}
 
 const user = { id: 'fixture-student', username: 'student', display_name: '测试同学', role: 'user' }
 const school = {
@@ -164,12 +199,18 @@ test('登录校验、密码显隐、角色菜单和安全退出', async ({ page 
   const state = await fixture(page)
   await page.goto('/')
   await expect(page.getByRole('heading', { name: '欢迎回来' })).toBeVisible()
+  await expect(page.getByText('WELCOME TO YOUR STUDY OS')).toHaveCount(0)
+  await expect(page.getByText('YOUR PERSONAL STUDY OS / V0.1')).toHaveCount(0)
+  await expectFontSize(page.locator('.login-subtitle'), 14)
+  await expectFontSize(page.locator('.preview-entry-note'))
   await page.getByLabel('账号', { exact: true }).fill('student')
   await page.getByLabel('密码', { exact: true }).fill('wrong-password')
   await page.getByRole('button', { name: '显示密码' }).click()
   await expect(page.locator('#password')).toHaveAttribute('type', 'text')
   await page.getByRole('button', { name: '登录', exact: true }).click()
-  await expect(page.getByRole('alert')).toContainText('用户名或密码错误')
+  const loginError = page.getByRole('alert')
+  await expect(loginError).toContainText('用户名或密码错误')
+  await expectTextContrast(loginError)
   await page.getByLabel('密码', { exact: true }).fill('correct-password')
   await page.getByRole('button', { name: '登录', exact: true }).click()
   await expect(page.getByRole('heading', { name: '把学习平台，连在一起。' })).toBeVisible()
@@ -195,6 +236,53 @@ test('后端只实现登录却缺少向导路由时，明确提示服务配置�
   await expect(page.getByRole('alert')).toContainText('当前后端未提供平台连接服务')
   await expect(page.getByRole('button', { name: '连接学习通', exact: true })).toBeDisabled()
   await expect(page.getByRole('button', { name: '连接钉钉', exact: true })).toBeDisabled()
+})
+
+test('手机平台卡单列排列，长名称完整显示且操作区域足够大', async ({ page }) => {
+  await fixture(page, { authenticated: true, activeDws: true })
+  await page.goto('/')
+  await expect(page.getByRole('button', { name: '选择群', exact: true })).toBeEnabled()
+  for (const width of [320, 360, 390, 600, 601, 740]) {
+    await page.setViewportSize({ width, height: 844 })
+    const cards = page.locator('.platform-card')
+    await expect(cards).toHaveCount(4)
+    if (width === 390) {
+      await page.locator('.platform-grid').screenshot({ path: 'test-results/platform-cards-mobile-390.png' })
+    }
+    const boxes = await cards.evaluateAll((elements) => elements.map((element) => {
+      const card = element.getBoundingClientRect()
+      const title = element.querySelector('h3')!
+      const status = element.querySelector('.connection-pill')!
+      const action = element.querySelector('button')!
+      const nameBox = title.getBoundingClientRect()
+      const statusBox = status.getBoundingClientRect()
+      const actionBox = action.getBoundingClientRect()
+      return {
+        x: card.x, right: card.right, y: card.y, bottom: card.bottom,
+        titleFits: title.scrollWidth <= title.clientWidth,
+        statusSeparate: nameBox.right <= statusBox.left,
+        actionWidth: actionBox.width,
+        actionHeight: actionBox.height,
+        availableWidth: element.querySelector('.platform-card-action')!.clientWidth,
+      }
+    }))
+    for (const [index, box] of boxes.entries()) {
+      expect(box.x).toBeGreaterThanOrEqual(0)
+      expect(box.right).toBeLessThanOrEqual(width)
+      expect(box.titleFits).toBe(true)
+      expect(box.statusSeparate).toBe(true)
+      expect(box.actionHeight).toBeGreaterThanOrEqual(44)
+      expect(box.actionWidth).toBeCloseTo(box.availableWidth, 0)
+      if (index > 0) {
+        expect(box.x).toBeCloseTo(boxes[0].x, 0)
+        expect(box.y).toBeGreaterThanOrEqual(boxes[index - 1].bottom)
+      }
+    }
+    await expect(page.getByRole('heading', { name: '中国大学 MOOC', exact: true })).toBeVisible()
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+  }
+  await page.getByRole('button', { name: '选择群', exact: true }).click()
+  await expect(page.getByRole('dialog')).toBeVisible()
 })
 
 test('完整向导：钉钉授权、保留旧群、分页选群、教务连接和课表导入', async ({ page }) => {
@@ -252,9 +340,12 @@ test('完整向导：钉钉授权、保留旧群、分页选群、教务连接�
     },
   })
   await page.getByRole('button', { name: '进入学业工作台' }).click()
+  await expect(page.getByRole('button', { name: '打开学习助手' })).toBeVisible()
+  await page.getByRole('button', { name: '打开学习助手' }).click()
   await expect(page.getByRole('region', { name: 'Academic Assistant 对话区域' })).toBeVisible()
+  await page.getByRole('button', { name: '关闭学习助手' }).click()
   await page.reload()
-  await expect(page.getByRole('region', { name: 'Academic Assistant 对话区域' })).toBeVisible()
+  await expect(page.getByRole('button', { name: '打开学习助手' })).toBeVisible()
   await page.getByRole('button', { name: '我的', exact: true }).click()
   await page.getByRole('button', { name: '查看设置' }).click()
   await expect(page.getByText('时间表就绪，新学期见。')).toBeVisible()

@@ -8,7 +8,6 @@ export function Brand({ small = false }: { small?: boolean }) {
       <PixelComputer className="brand-computer" />
       <div>
         <span className="brand-name">Academic Assistant</span>
-        {!small && <span className="brand-subtitle">YOUR PERSONAL STUDY OS / V0.1</span>}
       </div>
     </div>
   )

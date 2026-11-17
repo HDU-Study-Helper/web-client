@@ -14,6 +14,10 @@
   --line: #dcd5c4;
   --light-blue: #e9ebf1;
   --green: #5b8058;
+  --text-primary: #17263e;
+  --text-secondary: #586477;
+  --text-tertiary: #5f685d;
+  --text-warning: #8f432d;
   --pixel: 'Lyusung', 'Courier New', monospace;
   --mono: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
   font-family:
@@ -531,6 +535,56 @@ select:focus {
     margin-top: 70px;
   }
 }
+/* Keep operational copy readable; decorative labels may remain smaller. */
+.notice,
+.login-top,
+.login-subtitle,
+.preview-entry-note,
+.first-time-note p,
+.login-footer,
+.sidebar-intro,
+.step-nav > span > span,
+.sidebar-note p,
+.step-title > p,
+.platform-card > p:not(.group-caption),
+.platform-subtitle,
+.connection-pill,
+.group-caption,
+.gentle-note,
+.school-notes span,
+.field-hint,
+.completion-intro,
+.completion-summary span,
+.completion-summary strong,
+.completion-footnote,
+.setup-bottom,
+.save-note,
+.privacy-note,
+.period-number,
+.periods-table-header,
+.period-row input,
+.semester-strip {
+  font-size: 12px;
+}
+.notice,
+.login-subtitle,
+.first-time-note p,
+.sidebar-intro,
+.sidebar-note p,
+.step-title > p,
+.platform-card > p:not(.group-caption),
+.gentle-note,
+.completion-intro,
+.privacy-note {
+  line-height: 1.7;
+}
+.login-subtitle,
+.sidebar-intro,
+.step-title > p,
+.completion-intro {
+  font-size: 14px;
+}
+
 @media (max-width: 740px) {
   .login-story {
     background: #eee8d8;
@@ -559,6 +613,15 @@ select:focus {
     height: 30px;
   }
 }
+.login-top,
+.login-subtitle,
+.preview-entry-note,
+.first-time-note p,
+.login-footer,
+.sidebar-intro,
+.step-nav > span > span,
+.sidebar-note p,
+.sidebar-kicker,
 .step-title > p,
 .platform-card > p:not(.group-caption),
 .platform-subtitle,
@@ -569,11 +632,88 @@ select:focus {
 .school-notes span,
 .field-hint,
 .completion-intro,
-.completion-footnote {
-  color: #7a8172;
+.completion-footnote,
+.privacy-note,
+.group-caption {
+  color: var(--text-secondary);
 }
+.connection-pill,
+.school-badge,
+.period-number > span {
+  color: var(--text-tertiary);
+}
+.connection-pill.connected,
+.connected-label {
+  color: #43633f;
+}
+.notice-error {
+  color: var(--text-warning);
+  border-color: #bd816a;
+}
+
 .platform-card-action,
 .school-notes,
 .sidebar-note {
   border-color: var(--line);
+}
+
+.platform-card-top {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.platform-card-top .platform-logo {
+  flex-shrink: 0;
+}
+.platform-card-top h3 {
+  min-width: 0;
+  font-size: 16px;
+  line-height: 1.5;
+  letter-spacing: 0;
+  overflow-wrap: anywhere;
+}
+.platform-card-top .connection-pill {
+  flex-shrink: 0;
+  font-size: 12px;
+  white-space: nowrap;
+  padding: 4px 7px;
+}
+.platform-card-action > .text-button {
+  width: 100%;
+  min-height: 44px;
+  justify-content: space-between;
+  font-size: 14px;
+  white-space: normal;
+}
+
+@media (max-width: 740px) {
+  .platform-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 14px;
+  }
+  .platform-card {
+    min-width: 0;
+    padding: 16px 14px 0;
+  }
+  .platform-card-top .platform-logo {
+    width: 36px;
+    height: 36px;
+    font-size: 21px;
+  }
+  .platform-card > p:not(.group-caption) {
+    margin-top: 0;
+    min-height: 0;
+    max-width: none;
+    font-size: 14px;
+    line-height: 1.7;
+  }
+  .platform-card-action {
+    margin-top: 14px;
+    min-height: 52px;
+  }
+  .platform-card .group-caption {
+    font-size: 12px;
+    margin-top: 0;
+  }
 }

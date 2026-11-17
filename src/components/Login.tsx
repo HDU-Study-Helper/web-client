@@ -44,9 +44,6 @@ export default function Login({
       <section className="login-story" aria-label="Academic Assistant 学业助手介绍">
         <Brand />
         <div className="story-copy">
-          <div className="eyebrow">
-            <span /> A PERSONAL COMPUTER FOR LEARNING
-          </div>
           <h1>
             让学习，
             <br />
@@ -59,39 +56,16 @@ export default function Login({
           </p>
         </div>
         <div className="retro-login-art" aria-hidden="true">
-          <div className="login-art-top">
-            <span>01 / YOUR STUDY COMPANION</span>
-            <span>
-              ONLINE <i />
-            </span>
-          </div>
           <PixelComputer happy />
-          <div className="login-art-caption">
-            LESS NOISE.
-            <br />
-            <span>MORE FOCUS.</span>
-          </div>
-          <div className="login-art-bottom">
-            <span>课程 / 任务 / 日程 / 灵感</span>
-            <span>READY WHEN YOU ARE. ↵</span>
-          </div>
-        </div>
-        <div className="story-bottom">
-          <span className="status-square" />
-          <span>为学习设计，按你的方式使用。</span>
-          <span className="mono">EST. 2026</span>
         </div>
       </section>
       <section className="login-main">
         <div className="login-top">
-          <span className="mono">ACCOUNT / 登录</span>
           <button className="text-button" onClick={() => setHelp(!help)} type="button">
             需要帮助 <ArrowRight size={14} />
           </button>
         </div>
         <div className="login-form-wrap">
-          <div className="login-section-number">[ 01 — SIGN IN ]</div>
-          <div className="eyebrow form-eyebrow">WELCOME TO YOUR STUDY OS</div>
           <h2>欢迎回来</h2>
           <p className="login-subtitle">新的一天，从清晰的安排开始。</p>
           {message && !error && <Notice>{message}</Notice>}
@@ -178,7 +152,6 @@ export default function Login({
         <footer className="login-footer">
           <LockKeyhole size={13} />
           <span>你的连接和学业数据，始终属于你。</span>
-          <span className="footer-version">STUDY OS · v0.1</span>
         </footer>
       </section>
     </main>

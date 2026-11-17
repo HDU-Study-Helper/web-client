@@ -6,7 +6,6 @@ import {
   BookOpen,
   CalendarDays,
   Check,
-  CheckCheck,
   ChevronRight,
   CircleCheck,
   Clock3,
@@ -307,7 +306,6 @@ export default function Wizard({
       </header>
       <div className="setup-layout">
         <aside className="setup-sidebar">
-          <div className="sidebar-kicker">MAKE IT YOURS</div>
           <h1>
             让学习助手
             <br />
@@ -351,7 +349,6 @@ export default function Wizard({
               可以随时回到设置调整连接。
             </p>
           </div>
-          <span className="sidebar-footer">HDU ACADEMIC ASSISTANT</span>
         </aside>
         <main className="setup-main">
           <div className="setup-content" ref={content} tabIndex={-1}>
@@ -373,7 +370,6 @@ export default function Wizard({
                   <CircleCheck size={46} strokeWidth={1.6} />
                   <span />
                 </div>
-                <div className="eyebrow">ALL SET, ALL YOURS</div>
                 <h2>
                   {draft.importResult ? '时间表就绪，新学期见。' : '设置已保存，随时可以出发。'}
                 </h2>
@@ -469,7 +465,6 @@ export default function Wizard({
             ) : (
               <>
                 <div className="step-topline">
-                  <span className="eyebrow">LET’S GET YOU STARTED</span>
                   <span className="step-progress">
                     STEP <strong>0{draft.step + 1}</strong> / 04
                   </span>
@@ -549,7 +544,6 @@ export default function Wizard({
                           : !!errors.sources ||
                             !!errors.platforms ||
                             !sources.some((s) => s.source === platform.id && s.qr_login)
-                        const Icon = platform.icon
                         return (
                           <article
                             key={platform.id}
@@ -559,6 +553,7 @@ export default function Wizard({
                               <span className={`platform-logo ${platform.color}`}>
                                 {platform.mark}
                               </span>
+                              <h3>{platform.name}</h3>
                               <span className={`connection-pill ${connection ? 'connected' : ''}`}>
                                 {connection ? (
                                   <>
@@ -572,20 +567,10 @@ export default function Wizard({
                                 )}
                               </span>
                             </div>
-                            <h3>{platform.name}</h3>
-                            <span className="platform-subtitle">{platform.subtitle}</span>
                             <p>{platform.description}</p>
-                            <div className="platform-tag">
-                              <Icon size={13} />
-                              {platform.tag}
-                            </div>
                             <div className="platform-card-action">
                               {connection ? (
                                 <>
-                                  <span className="connected-label">
-                                    <CheckCheck size={16} />
-                                    连接已就绪
-                                  </span>
                                   {isDws ? (
                                     <button
                                       className="text-button"
@@ -927,10 +912,7 @@ export default function Wizard({
               </>
             )}
           </div>
-          <footer className="setup-bottom">
-            <span>把时间留给学习，把整理交给 HAA。</span>
-            <span>HAA · v0.1</span>
-          </footer>
+
         </main>
       </div>
       {auth && (
