@@ -1,0 +1,31 @@
+.group-limit:not(:empty) { margin: 12px 0; padding: 10px 12px; background: var(--light-blue); color: var(--text-primary); line-height: 1.7; }
+[aria-invalid='true'] { border-color: var(--text-warning); }
+.field-error { color: var(--text-warning); font-size: 12px; line-height: 1.7; margin-top: 6px; }
+.modal-actions { flex-wrap: wrap; gap: 12px; }
+@media (max-width: 760px), (pointer: coarse) {
+  :is(.icon-button, .text-button, .quiet-link, .module-action, .chat-close-button, .send-button, .all-courses, .os-navigation > button, .add-period, .load-more) {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  .study-os .toggle {
+    width: 52px;
+    height: 44px;
+    padding: 12px 2px;
+    background-clip: content-box;
+    border-color: transparent;
+  }
+  .study-os .toggle > span { height: 16px; }
+  .study-os .toggle.on > span { transform: translateX(29px); }
+  .study-os .console-tools > button { min-height: 44px; }
+  .study-os .preference-row { flex-wrap: wrap; gap: 12px; }
+  .study-os .preference-row > div { flex: 1 1 150px; min-width: 0; }
+  .study-os .profile-card { flex-wrap: wrap; }
+  .setup-header { height: auto; min-height: 65px; flex-wrap: wrap; padding-top: 8px; padding-bottom: 8px; }
+  .setup-header .header-right { gap: 8px; margin-left: auto; }
+  .setup-header .brand { min-width: 0; }
+  .setup-header .brand-name { white-space: normal; }
+  .setup-header .header-section { font-size: 12px; }
+  .period-actions { gap: 8px; }
+  .modal .modal-heading { gap: 12px; }
+  .modal .qr-box { max-width: 100%; }
+}

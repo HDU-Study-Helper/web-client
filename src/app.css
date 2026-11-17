@@ -1,0 +1,11 @@
+/* Explicit cascade order, independent of stylesheet import statement order. */
+@layer tokens, base, components, theme, workspace, responsive, timetable, accessibility, polish;
+@import './tokens.css' layer(tokens);
+@import './styles.css' layer(base);
+@import './components.css' layer(components);
+@import './retro.css' layer(theme);
+@import './workspace.css' layer(workspace);
+@import './workspace-responsive.css' layer(responsive);
+@import './timetable.css' layer(timetable);
+@import './accessibility.css' layer(accessibility);
+@import './workspace-polish.css' layer(polish);

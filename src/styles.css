@@ -1,117 +1,17 @@
-:root {
-  font-family:
-    'DM Sans',
-    'Noto Sans SC',
-    -apple-system,
-    BlinkMacSystemFont,
-    'Segoe UI',
-    sans-serif;
-  color: #233249;
-  background: #f8fafc;
-  font-synthesis: none;
-  font-weight: 400;
-  font-size: 14px;
-  --blue: #315ee8;
-  --blue-hover: #244ccd;
-  --muted: #7a8598;
-  --line: #e8ecf3;
-  --light-blue: #edf2ff;
-  --green: #2b9475;
-}
 * {
   box-sizing: border-box;
 }
 html,
-body,
 #root {
   width: 100%;
   min-width: 0;
 }
-body {
-  margin: 0;
-}
-button,
-input,
-select {
-  font: inherit;
-}
-button,
-a,
-input,
-select {
+a {
   -webkit-tap-highlight-color: transparent;
-}
-button {
-  cursor: pointer;
-}
-button:disabled {
-  cursor: not-allowed;
-  opacity: 0.48;
-}
-button {
-  transition:
-    background 0.18s,
-    color 0.18s,
-    border-color 0.18s,
-    box-shadow 0.18s;
 }
 a {
   color: inherit;
   text-decoration: none;
-}
-button:focus-visible,
-a:focus-visible {
-  outline: 3px solid #9db4ff;
-  outline-offset: 4px;
-}
-input,
-select {
-  width: 100%;
-  height: 47px;
-  min-width: 0;
-  padding: 0 14px;
-  border: 1px solid #dfe5ee;
-  border-radius: 8px;
-  color: #24334b;
-  background: white;
-  outline: none;
-  transition:
-    border-color 0.18s,
-    box-shadow 0.18s;
-}
-input::placeholder {
-  color: #a3abba;
-  font-size: 13px;
-}
-input:focus,
-select:focus {
-  border-color: #6c8df4;
-  box-shadow: 0 0 0 3px #315ee810;
-}
-input:disabled,
-select:disabled {
-  background: #f6f7fa;
-}
-input[type='checkbox'] {
-  height: 17px;
-  width: 17px;
-  accent-color: var(--blue);
-  flex-shrink: 0;
-}
-input[type='time'] {
-  padding: 0 10px;
-}
-label {
-  display: block;
-  font-size: 13px;
-  font-weight: 500;
-  color: #3b485d;
-}
-fieldset {
-  border: 0;
-  padding: 0;
-  margin: 0;
-  min-width: 0;
 }
 h1,
 h2,
@@ -144,152 +44,8 @@ strong {
   align-items: center;
   gap: 8px;
 }
-.button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 9px;
-  min-height: 44px;
-  border: 1px solid transparent;
-  padding: 0 21px;
-  border-radius: 8px;
-  font-size: 13px;
-  font-weight: 500;
-  white-space: nowrap;
-}
-.button-primary {
-  color: #fff;
-  background: var(--blue);
-  box-shadow: 0 4px 8px #315ee814;
-}
-.button-primary:hover:not(:disabled) {
-  background: var(--blue-hover);
-  box-shadow: 0 5px 13px #315ee825;
-}
-.button-secondary {
-  background: #fff;
-  border-color: #dce3f0;
-  color: #4365bc;
-}
-.button-secondary:hover:not(:disabled) {
-  background: #f4f7ff;
-  border-color: #b8c7eb;
-}
-.button-quiet {
-  background: transparent;
-  color: #6c788b;
-  padding-left: 0;
-}
-.button-quiet:hover:not(:disabled) {
-  color: var(--blue);
-}
-.text-button {
-  background: none;
-  border: 0;
-  padding: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-  color: #607086;
-  font-size: 12px;
-  line-height: 1.6;
-}
-.text-button:hover:not(:disabled) {
-  color: var(--blue);
-}
-.icon-button {
-  border: 0;
-  background: transparent;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: #8591a4;
-  padding: 7px;
-  border-radius: 6px;
-}
-.icon-button:hover:not(:disabled) {
-  background: #eef2fa;
-  color: var(--blue);
-}
-.quiet-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 12px;
-  color: #7d8799;
-}
-.quiet-link:hover {
-  color: var(--blue);
-}
 .spinner {
   animation: spin 1s linear infinite;
-}
-.notice {
-  display: flex;
-  align-items: flex-start;
-  gap: 9px;
-  padding: 12px 14px;
-  border: 1px solid #dfe8fb;
-  background: #f3f7ff;
-  color: #587097;
-  border-radius: 8px;
-  font-size: 12px;
-  line-height: 1.85;
-  margin: 16px 0;
-}
-.notice > svg {
-  margin-top: 3px;
-}
-.notice > div {
-  flex: 1;
-  min-width: 0;
-}
-.notice .text-button {
-  color: inherit;
-  text-decoration: underline;
-  margin-left: 8px;
-}
-.notice-error {
-  background: #fff5f3;
-  border-color: #f9dfda;
-  color: #b45448;
-}
-.notice-success {
-  background: #f0f9f5;
-  border-color: #d7eee3;
-  color: #2c8b69;
-}
-.notice .icon-button {
-  padding: 2px;
-}
-.input-with-icon {
-  display: flex;
-  align-items: center;
-  gap: 11px;
-  padding: 0 14px;
-  border: 1px solid #dfe5ee;
-  border-radius: 8px;
-  background: white;
-  transition:
-    border 0.18s,
-    box-shadow 0.18s;
-  color: #9aa4b5;
-}
-.input-with-icon:focus-within {
-  border-color: #6c8df4;
-  box-shadow: 0 0 0 3px #315ee810;
-}
-.input-with-icon input {
-  border: 0;
-  padding: 0;
-  box-shadow: none;
-  height: 49px;
-  background: transparent;
-}
-.input-with-icon .icon-button {
-  padding: 5px;
-  margin-right: -5px;
 }
 .brand {
   display: flex;
@@ -618,7 +374,7 @@ strong {
   width: 22px;
   height: 22px;
   border-radius: 50%;
-  font-family: Georgia, serif;
+  font-family: var(--font-body);
   font-size: 13px;
   display: grid;
   place-items: center;
@@ -1089,7 +845,7 @@ strong {
 .dingtalk {
   background: #edf4ff;
   color: #4c92ef;
-  font-family: 'DM Sans', sans-serif;
+  font-family: var(--font-body);
   font-style: italic;
   font-weight: 700;
 }
@@ -1101,13 +857,13 @@ strong {
 .mooc {
   background: #eef6e9;
   color: #8ca74d;
-  font-family: Georgia, serif;
+  font-family: var(--font-body);
   font-size: 29px;
 }
 .ucampus {
   background: #f0edfd;
   color: #8c7ac9;
-  font-family: 'DM Sans', sans-serif;
+  font-family: var(--font-body);
   font-weight: 500;
 }
 .connection-pill {
@@ -1702,32 +1458,6 @@ strong {
 }
 
 /* Dialogs and completion */
-.modal {
-  border: 1px solid #e4eaf3;
-  border-radius: 17px;
-  padding: 27px 30px;
-  max-width: 470px;
-  width: calc(100% - 40px);
-  max-height: calc(100dvh - 50px);
-  color: #35435a;
-  background: #fff;
-  box-shadow: 0 30px 100px #172b4d26;
-  overflow-y: auto;
-}
-.modal::backdrop {
-  background: #1b2d4b61;
-  backdrop-filter: blur(4px);
-}
-.modal-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-}
-.modal-heading h2 {
-  font-size: 18px;
-  font-weight: 600;
-}
 .modal-description {
   font-size: 12px;
   line-height: 1.95;
@@ -1825,9 +1555,6 @@ strong {
   align-items: center;
   gap: 5px;
   margin-top: 22px;
-}
-.modal .button {
-  font-size: 11px;
 }
 .group-search {
   margin: 20px 0 15px;
@@ -2736,13 +2463,6 @@ strong {
   .semester-strip {
     font-size: 9px;
     padding: 11px;
-  }
-  .modal {
-    padding: 24px 21px;
-    width: calc(100% - 30px);
-  }
-  .modal-heading h2 {
-    font-size: 17px;
   }
   .completion-summary {
     padding: 3px 15px;

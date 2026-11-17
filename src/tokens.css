@@ -1,0 +1,40 @@
+@font-face {
+  font-family: 'Lyusung';
+  src: url('../fonts/lyusung-24px-square.woff2') format('woff2');
+  font-weight: 400 900;
+  font-display: swap;
+}
+:root {
+  --blue: #405b96;
+  --blue-hover: #304879;
+  --muted: #797e80;
+  --line: #dcd5c4;
+  --light-blue: #e9ebf1;
+  --green: #5b8058;
+  --paper: #f8f2e4;
+  --paper-dark: #eee6d4;
+  --ink: #17263e;
+  --text-primary: #17263e;
+  --text-secondary: #586477;
+  --text-tertiary: #5f685d;
+  --text-warning: #8f432d;
+  --pixel: 'Lyusung', 'Courier New', monospace;
+  --mono: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
+  --surface-input: #fffcf3;
+  --surface-secondary: #fcf7eb;
+  --radius-control: 2px;
+  --radius-modal: 3px;
+  --space-control: 12px;
+  --space-section: 24px;
+  --space-card: 20px;
+  --page-gutter: clamp(16px, 2.5vw, 40px);
+  --font-body: 'PingFang SC', 'Microsoft YaHei', 'Noto Sans SC', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --shadow-primary: 2px 2px 0 #26375220;
+  --shadow-modal: 5px 5px 0 #18283f24, 0 20px 80px #18283f20;
+  font-family: var(--font-body);
+  color: var(--ink);
+  background: var(--paper);
+  font-synthesis: none;
+  font-weight: 400;
+  font-size: 14px;
+}

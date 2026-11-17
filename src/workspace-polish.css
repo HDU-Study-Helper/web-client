@@ -1,0 +1,141 @@
+/* Quiet academic content around the existing computer and assistant identity. */
+.study-os {
+  height: auto;
+  min-height: 100dvh;
+  overflow: visible;
+}
+.study-os .os-header {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  padding-inline: var(--page-gutter);
+  border-bottom: 1px solid var(--line);
+  box-shadow: none;
+}
+.study-os .workspace-meta { padding: 16px var(--page-gutter); font-family: var(--font-body); letter-spacing: 0; }
+.study-os .workspace-main { flex: 1 0 auto; min-width: 0; padding: 0 var(--page-gutter) 32px; overflow: visible; }
+.study-os .dashboard-scroll { height: auto; overflow: visible; padding: 0; }
+.study-os .standalone-page { min-height: 0; padding: 8px 0 0; gap: 0; }
+.study-os .standalone-page > .study-module { flex: none; }
+.study-os .standalone-title { margin-bottom: var(--space-section); gap: 16px; flex-wrap: wrap; }
+.study-os .standalone-title h1 { margin: 0; line-height: 1.4; }
+.study-os .welcome-panel {
+  border: 0;
+  box-shadow: none;
+  background: var(--paper-dark);
+  padding: var(--space-section);
+  gap: var(--space-card);
+  margin-bottom: var(--space-section);
+}
+.study-os .welcome-panel::before,
+.study-os .welcome-panel::after { display: none; }
+.study-os .welcome-copy h1 { margin: 0 0 12px; }
+.study-os .welcome-copy p { font-size: 14px; line-height: 1.7; margin-top: 8px; }
+.study-os .study-module {
+  border: 1px solid var(--line);
+  box-shadow: none;
+  padding: 0 var(--space-card) var(--space-control);
+  margin-bottom: var(--space-section);
+  background: var(--surface-secondary);
+}
+.study-os .dashboard-middle { column-gap: var(--space-section); }
+.study-os .module-heading { min-height: 56px; padding-block: 8px; gap: 12px; border: 0; }
+.study-os .module-heading h2 { white-space: normal; }
+.study-os .study-module .module-heading .module-subtitle { font-family: var(--font-body); font-size: 16px; font-weight: 600; line-height: 1.5; }
+.study-os .overview-grid { padding: 12px 0; gap: 16px; }
+.study-os .stat { padding: 8px; }
+.study-os .stat strong { font-family: var(--font-body); font-size: clamp(28px, 3vw, 40px); font-weight: 600; }
+.study-os .schedule-list { padding: 8px 0 4px; }
+.study-os .schedule-list li { min-height: 60px; gap: 16px; }
+.study-os .schedule-list strong { font-size: 14px; line-height: 1.6; }
+.study-os .module-footnote { padding: 12px 0 4px; line-height: 1.7; }
+.study-os .brief-card { border: 0; border-left: 3px solid var(--text-warning); margin-top: 8px; }
+.study-os .brief-card h3 { background: transparent; padding: 14px 16px 0; font-size: 14px; }
+.study-os .brief-card > p { padding: 8px 16px 16px; font-size: 14px; line-height: 1.8; }
+.study-os .brief-link { min-height: 44px; padding: 12px 0 0; font-size: 14px; }
+.study-os .course-table-head { padding: 12px 8px; }
+.study-os .course-row { min-height: 64px; padding: 12px 8px; }
+.study-os .course-name strong { font-size: 14px; }
+.study-os .course-code { font-family: var(--font-body); font-size: 16px; font-weight: 600; }
+.study-os .profile-avatar { font-family: var(--font-body); }
+.study-os .schedule-dates { gap: 12px; margin-bottom: var(--space-section); }
+.study-os .schedule-dates > button { padding: 14px 16px; }
+.study-os .schedule-list.detailed { padding: 8px 0 16px; }
+.study-os .schedule-list.detailed li { min-height: 96px; gap: 24px; }
+.study-os .profile-card { padding: var(--space-section); gap: 16px; border-color: var(--line); box-shadow: none; margin-bottom: var(--space-section); }
+.study-os .preference-row { padding: 20px 0; gap: 20px; }
+.study-os .preference-row p { margin-top: 8px; font-size: 14px; line-height: 1.7; }
+.study-os .standalone-action,
+.study-os .profile-page > .button-secondary { margin-top: 0; }
+.study-os h1:focus-visible { outline: 2px solid var(--blue); outline-offset: 6px; }
+.platform-logo { font-family: var(--font-body); font-style: normal; }
+.step-number { font-family: var(--mono); }
+.setup-header { border-color: var(--line); box-shadow: none; }
+.setup-main { padding: 40px var(--page-gutter) 32px; }
+.setup-content .platform-grid { gap: 20px; }
+.setup-content .platform-card { border-color: var(--line); box-shadow: none; padding: 20px 20px 0; }
+.setup-content .platform-card:hover { border-color: var(--blue); box-shadow: none; }
+.setup-content .platform-card-action { margin-top: 16px; }
+.setup-content .wizard-footer { margin-top: 24px; padding-top: 20px; gap: 16px; }
+.setup-content .school-card,
+.setup-content .generator-card { box-shadow: none; border-color: var(--line); }
+.setup-content .step-title { margin-bottom: 24px; }
+.login-form { gap: 16px; }
+@media (max-width: 760px) {
+  .setup-main { padding: 24px var(--page-gutter); }
+  .setup-content .platform-card { padding: 16px 14px 0; }
+  .setup-content .wizard-footer { flex-wrap: wrap; }
+  .study-os .workspace-meta { padding-block: 12px; }
+  .study-os .workspace-main { padding-bottom: 24px; }
+  .study-os .welcome-panel { padding: 20px 16px; gap: 12px; margin-bottom: 20px; }
+  .study-os .welcome-panel > .pixel-computer { width: 40px; }
+  .study-os .welcome-copy h1 { font-size: 24px; }
+  .study-os .study-module { padding: 0 16px 12px; margin-bottom: 20px; }
+  .study-os .overview-grid { gap: 8px; }
+  .study-os .stat { gap: 8px; padding: 8px 0; }
+  .study-os .stat strong { font-size: 28px; }
+  .study-os .stat-icon > svg { width: 20px; }
+  .study-os .schedule-list li { gap: 12px; }
+  .study-os .schedule-list.detailed li { gap: 16px; }
+  .study-os .profile-card { padding: 20px 16px; }
+  .study-os .standalone-title { margin-bottom: 20px; }
+}
+/* Desktop home fills the viewport; long modules own their scroll position. */
+@media (min-width: 1101px) and (min-height: 600px) {
+  .study-os.is-home { height: 100dvh; min-height: 0; overflow: hidden; }
+  .study-os.is-home .workspace-main { flex: 1 1 0; min-height: 0; padding-bottom: 20px; }
+  .study-os.is-home .dashboard-scroll {
+    height: 100%;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr);
+    grid-template-rows: auto minmax(0, 1fr);
+    gap: 20px;
+  }
+  .study-os.is-home .welcome-panel { min-height: 0; margin: 0; padding: 20px; }
+  .study-os.is-home .welcome-copy h1 { font-size: clamp(22px, 2vw, 30px); white-space: normal; }
+  .study-os.is-home .overview-module { margin: 0; }
+  .study-os.is-home .overview-grid { padding: 4px 0; gap: 12px; }
+  .study-os.is-home .stat strong { font-size: 30px; }
+  .study-os.is-home .dashboard-middle {
+    min-height: 0;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 20px;
+  }
+  .study-os.is-home .study-module { min-height: 0; overflow-y: auto; overscroll-behavior-y: contain; scrollbar-width: thin; margin: 0; }
+  .study-os.is-home .module-heading { position: sticky; top: 0; z-index: 1; background: var(--surface-secondary); min-height: 48px; }
+  .study-os.is-home .courses-module .course-table-head { position: sticky; top: 48px; z-index: 1; background: var(--surface-secondary); }
+  .study-os.is-home .courses-module .all-courses { position: sticky; bottom: -12px; background: var(--surface-secondary); min-height: 44px; }
+  .study-os.is-home .course-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px 12px; }
+  .study-os.is-home .course-task { grid-column: 1 / -1; }
+  .study-os.is-home .course-table-head { grid-template-columns: 1fr 1fr; }
+  .study-os.is-home .course-table-head > span:last-child { display: none; }
+}
+@media (max-width: 380px) {
+  .study-os .overview-grid { grid-template-columns: 1fr; gap: 0; }
+  .study-os .stat:not(:last-child)::after { display: none; }
+  .study-os .stat { border-bottom: 1px solid var(--line); padding-block: 12px; }
+  .study-os .stat:last-child { border: 0; }
+}

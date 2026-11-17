@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { Check, MessageCircle, Search } from 'lucide-react'
 import { api, dwsPath, errorMessage } from '../api'
 import type { Group } from '../types'
-import { Modal, Notice, Spinner } from './UI'
+import { Modal, Notice, Spinner, type ModalHandle } from './UI'
 
 export default function GroupDialog({
   connection,
@@ -24,6 +24,11 @@ export default function GroupDialog({
   const [discoveryError, setDiscoveryError] = useState('')
   const [version, setVersion] = useState(0)
   const alive = useRef(true)
+  const modalRef = useRef<ModalHandle>(null)
+  const saveController = useRef<AbortController | undefined>(undefined)
+  const searchRef = useRef<HTMLInputElement>(null)
+  const descriptionId = useId()
+  const limitId = useId()
   useEffect(() => {
     alive.current = true
     const controller = new AbortController()
@@ -69,6 +74,7 @@ export default function GroupDialog({
     void load()
     return () => {
       alive.current = false
+      saveController.current?.abort()
       controller.abort()
     }
   }, [connection, version])
@@ -94,13 +100,15 @@ export default function GroupDialog({
   }
   async function save() {
     setSaving(true)
+    saveController.current = new AbortController()
     setError('')
     try {
       await api(`${dwsPath(connection)}/groups`, {
         method: 'PUT',
+        signal: saveController.current.signal,
         body: { groups: [...selected.values()] },
       })
-      onSaved()
+      if (alive.current) modalRef.current?.close(onSaved)
     } catch (error) {
       if (alive.current) setError(errorMessage(error))
     } finally {
@@ -111,13 +119,14 @@ export default function GroupDialog({
     `${group.name} ${group.id}`.toLowerCase().includes(search.toLowerCase()),
   )
   return (
-    <Modal title="选择钉钉采集群" onClose={onClose} busy={saving}>
-      <p className="modal-description">
+    <Modal title="选择钉钉采集群" closeHandleRef={modalRef} onDismissStart={() => { alive.current = false; saveController.current?.abort() }} onClose={onClose} busy={saving} descriptionId={descriptionId} initialFocusRef={searchRef}>
+      <p className="modal-description" id={descriptionId}>
         只读取你勾选的群。选好课程群和班级群，让重要消息汇入 HAA。
       </p>
       <div className="input-with-icon group-search">
         <Search size={17} />
         <input
+          ref={searchRef}
           aria-label="搜索已加载的群"
           placeholder="搜索已加载的群"
           value={search}
@@ -125,6 +134,13 @@ export default function GroupDialog({
           disabled={saving}
         />
       </div>
+      <p id={limitId} role="status" aria-live="polite" aria-atomic="true" className="group-limit">
+        {selected.size >= 100
+          ? '最多选择 100 个，请先取消一个。'
+          : selected.size >= 90
+            ? `还可选择 ${100 - selected.size} 个群。`
+            : ''}
+      </p>
       <div className="group-list" aria-busy={loading}>
         {visible.map((group) => (
           <label className={`group-row ${selected.has(group.id) ? 'selected' : ''}`} key={group.id}>
@@ -135,6 +151,7 @@ export default function GroupDialog({
             <input
               type="checkbox"
               checked={selected.has(group.id)}
+              aria-describedby={!selected.has(group.id) && selected.size >= 100 ? limitId : undefined}
               disabled={saving || (!selected.has(group.id) && selected.size >= 100)}
               onChange={(event) => {
                 const checked = event.target.checked

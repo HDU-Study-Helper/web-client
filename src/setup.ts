@@ -70,35 +70,77 @@ export const toMinutes = (value: string) =>
 export const toTime = (minutes: number) =>
   `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`
 
-export function validateTerm(draft: SetupDraft): string | undefined {
-  if (
-    !Number.isInteger(draft.academicYear) ||
-    draft.academicYear < 2000 ||
-    draft.academicYear > 2100 ||
-    ![1, 2].includes(draft.term)
-  )
-    return '请填写有效的学年和学期。'
-  const date = new Date(`${draft.monday}T00:00:00+08:00`)
-  if (!draft.monday || !Number.isFinite(date.getTime())) return '请选择第一教学周的周一日期。'
-  const local = new Date(date.getTime() + 8 * 3600_000)
-  if (local.toISOString().slice(0, 10) !== draft.monday) return '请选择有效的日期。'
-  if (local.getUTCDay() !== 1) return '第一教学周必须从周一开始，请重新选择日期。'
-  if (![draft.academicYear, draft.academicYear + 1].includes(local.getUTCFullYear()))
-    return '开学日期应在所选学年范围内。'
+export interface ValidationError {
+  /** The id of the input (or actionable control) that can resolve this error. */
+  field: string
+  message: string
 }
 
-export function validatePeriods(periods: Period[]): string | undefined {
-  if (!periods.length || periods.length > 30) return '请设置 1–30 节课的作息时间。'
-  let previous = -1
-  for (let i = 0; i < periods.length; i++) {
-    const p = periods[i],
-      start = toMinutes(p.start),
-      end = toMinutes(p.end)
-    if (p.period !== i + 1 || !Number.isFinite(start) || !Number.isFinite(end) || start >= end)
-      return `请检查第 ${i + 1} 节课的开始和结束时间。`
-    if (start < previous) return `第 ${i + 1} 节课与上一节课时间重叠，请调整。`
-    previous = end
+export const periodField = (index: number, field: 'start' | 'end') => `period-${index + 1}-${field}`
+
+export function validateTermFields(draft: SetupDraft): ValidationError[] {
+  const errors: ValidationError[] = []
+  if (!Number.isInteger(draft.academicYear) || draft.academicYear < 2000 || draft.academicYear > 2100)
+    errors.push({ field: 'academicYear', message: '请填写 2000–2100 之间的有效学年。' })
+  if (![1, 2].includes(draft.term))
+    errors.push({ field: 'term', message: '请选择有效的学期。' })
+  const date = new Date(`${draft.monday}T00:00:00+08:00`)
+  let message = ''
+  if (!draft.monday) message = '请选择第一教学周的周一日期。'
+  else if (!/^\d{4}-\d{2}-\d{2}$/.test(draft.monday) || !Number.isFinite(date.getTime()))
+    message = '请选择有效的日期。'
+  else {
+    const local = new Date(date.getTime() + 8 * 3600_000)
+    if (local.toISOString().slice(0, 10) !== draft.monday) message = '请选择有效的日期。'
+    else if (local.getUTCDay() !== 1) message = '第一教学周必须从周一开始，请重新选择日期。'
+    else if (![draft.academicYear, draft.academicYear + 1].includes(local.getUTCFullYear()))
+      message = '开学日期应在所选学年范围内。'
   }
+  if (message) errors.push({ field: 'monday', message })
+  return errors
+}
+
+export function validatePeriodFields(periods: Period[]): ValidationError[] {
+  const errors: ValidationError[] = []
+  if (!periods.length || periods.length > 30)
+    errors.push({ field: 'add-period', message: '请设置 1–30 节课的作息时间。' })
+  periods.forEach((p, i) => {
+    const start = toMinutes(p.start), end = toMinutes(p.end)
+    if (!Number.isFinite(start))
+      errors.push({ field: periodField(i, 'start'), message: `请填写第 ${i + 1} 节课的有效开始时间。` })
+    else if (i > 0 && start < toMinutes(periods[i - 1].end))
+      errors.push({ field: periodField(i, 'start'), message: `第 ${i + 1} 节课与上一节课时间重叠，请调整。` })
+    else if (p.period !== i + 1)
+      errors.push({ field: periodField(i, 'start'), message: `第 ${i + 1} 节课的节次编号无效，请删除后重新添加。` })
+    if (!Number.isFinite(end))
+      errors.push({ field: periodField(i, 'end'), message: `请填写第 ${i + 1} 节课的有效结束时间。` })
+    else if (Number.isFinite(start) && end <= start)
+      errors.push({ field: periodField(i, 'end'), message: `第 ${i + 1} 节课的结束时间必须晚于开始时间。` })
+  })
+  return errors
+}
+
+// Keep the original string-returning API for existing consumers.
+export function validateTerm(draft: SetupDraft): string | undefined {
+  return validateTermFields(draft)[0]?.message
+}
+export function validatePeriods(periods: Period[]): string | undefined {
+  return validatePeriodFields(periods)[0]?.message
+}
+
+export function validateGeneratorFields(count: number, start: string, duration: number, gap: number): ValidationError[] {
+  const errors: ValidationError[] = []
+  if (!Number.isInteger(count) || count < 1 || count > 30)
+    errors.push({ field: 'generator-count', message: '每天节数须为 1–30 的整数。' })
+  if (!Number.isFinite(toMinutes(start)))
+    errors.push({ field: 'generator-start', message: '请填写有效的首节开始时间。' })
+  if (!Number.isInteger(duration) || duration < 1 || duration > 240)
+    errors.push({ field: 'generator-duration', message: '每节时长须为 1–240 分钟的整数。' })
+  if (!Number.isInteger(gap) || gap < 0 || gap > 360)
+    errors.push({ field: 'generator-gap', message: '课间休息须为 0–360 分钟的整数。' })
+  if (!errors.length && toMinutes(start) + count * duration + (count - 1) * gap >= 1440)
+    errors.push({ field: 'generator-count', message: '生成的时间超出当天，请减少节数或调整开始时间、时长及间隔。' })
+  return errors
 }
 
 export function generatePeriods(

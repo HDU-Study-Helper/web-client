@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import QRCode from 'qrcode'
 import { ArrowUpRight, CheckCheck, Clock3, QrCode, RotateCw } from 'lucide-react'
 import { api, connectionPath, dwsPath, errorMessage, safeHTTPS } from '../api'
 import type { Connection, DWSAuth, PlatformAuth } from '../types'
-import { Modal, Notice, Spinner } from './UI'
+import { Modal, Notice, Spinner, type ModalHandle } from './UI'
 
 interface Challenge {
   connection: string
@@ -28,16 +28,50 @@ export default function AuthDialog({
   const [image, setImage] = useState('')
   const [retry, setRetry] = useState(0)
   const [clock, setClock] = useState(Date.now())
-  const [cancelling, setCancelling] = useState(false)
+  const [copyMessage, setCopyMessage] = useState('')
+  const descriptionId = useId()
+  const modalRef = useRef<ModalHandle>(null)
+  const initialCancelRef = useRef<HTMLButtonElement>(null)
+  const officialLinkRef = useRef<HTMLAnchorElement>(null)
+  const retryRef = useRef<HTMLButtonElement>(null)
   const current = useRef<Challenge>(undefined)
   const paused = useRef(false)
+  const closing = useRef(false)
+  const stop = useRef<() => void>(() => {})
   const connectedCallback = useRef(onConnected)
   connectedCallback.current = onConnected
   const dws = source === 'dws'
   useEffect(() => {
+    // This same-URL entry lets Back dismiss the dialog without consuming the page beneath it.
+    const marker = `auth-${crypto.randomUUID()}`
+    const url = window.location.href
+    const state = window.history.state
+    window.history.pushState({ ...state, haaAuthDialog: marker }, '', url)
+    const onPopState = () => {
+      if (window.history.state?.haaAuthDialog !== marker) modalRef.current?.close()
+    }
+    window.addEventListener('popstate', onPopState)
+    return () => {
+      closing.current = true
+      window.removeEventListener('popstate', onPopState)
+      // Never rewind an entry installed by external navigation while the dialog was open.
+      if (window.history.state?.haaAuthDialog === marker && window.location.href === url) {
+        window.history.back()
+      }
+    }
+  }, [])
+  useEffect(() => {
     const controller = new AbortController()
     let timer: ReturnType<typeof setTimeout>
     let disposed = false
+    const clockTimer = setInterval(() => setClock(Date.now()), 1000)
+    const dispose = () => {
+      disposed = true
+      clearTimeout(timer)
+      clearInterval(clockTimer)
+      controller.abort()
+    }
+    stop.current = dispose
     const previous = current.current
     const canResume =
       previous &&
@@ -50,6 +84,15 @@ export default function AuthDialog({
       setImage('')
     }
     setError('')
+    setCopyMessage('')
+    function finish() {
+      // Keep the success live region mounted long enough to announce it; dismissal cancels this timer.
+      clearTimeout(timer)
+      clearInterval(clockTimer)
+      timer = setTimeout(() => {
+        if (!disposed && !closing.current) modalRef.current?.close(() => connectedCallback.current())
+      }, 1000)
+    }
     async function run() {
       try {
         if (canResume) {
@@ -74,7 +117,7 @@ export default function AuthDialog({
         current.current = next
         setChallenge(next)
         if (next.auth.status === 'authorized') {
-          connectedCallback.current()
+          finish()
           return
         }
         await makeImage(next.auth)
@@ -105,6 +148,7 @@ export default function AuthDialog({
     }
     function schedule(value: Challenge) {
       if (
+        disposed ||
         paused.current ||
         ['expired', 'failed', 'cancelled', 'authorized'].includes(value.auth.status)
       )
@@ -116,7 +160,7 @@ export default function AuthDialog({
       timer = setTimeout(() => void poll(value), delay)
     }
     async function poll(value: Challenge) {
-      if (paused.current) return
+      if (disposed || paused.current) return
       try {
         const auth = await api<PlatformAuth | DWSAuth>(
           dws
@@ -129,7 +173,7 @@ export default function AuthDialog({
         current.current = next
         setChallenge(next)
         if (auth.status === 'authorized') {
-          connectedCallback.current()
+          finish()
           return
         }
         await makeImage(auth)
@@ -139,67 +183,104 @@ export default function AuthDialog({
       }
     }
     void run()
-    return () => {
-      disposed = true
-      clearTimeout(timer)
-      controller.abort()
-    }
+    return dispose
   }, [source, dws, existing?.id, retry])
-  useEffect(() => {
-    const timer = setInterval(() => setClock(Date.now()), 1000)
-    return () => clearInterval(timer)
-  }, [])
   const auth = challenge?.auth
   const expires = auth ? Math.max(0, Math.ceil((Date.parse(auth.expires_at) - clock) / 1000)) : 0
   const terminal =
     !!auth &&
+    auth.status !== 'authorized' &&
     (['expired', 'failed', 'cancelled'].includes(auth.status) ||
       (Number.isFinite(expires) && expires === 0))
-  const uri = auth && 'verification_uri' in auth ? safeHTTPS(auth.verification_uri) : undefined
-  async function cancel() {
-    if (cancelling) return
+  const status = error
+    ? 'failed'
+    : auth?.status === 'authorized'
+      ? 'authorized'
+      : terminal
+        ? auth?.status === 'failed'
+          ? 'failed'
+          : 'expired'
+        : auth?.status === 'scanned'
+          ? 'scanned'
+          : 'pending'
+  const statusMessage = {
+    pending: '等待扫码授权',
+    scanned: '已扫码，请在手机上确认',
+    authorized: '授权成功，正在完成连接',
+    expired: '二维码已失效，请重新获取',
+    failed: '授权未完成，请重试',
+  }[status]
+  const uri = auth
+    ? 'verification_uri' in auth
+      ? safeHTTPS(auth.verification_uri)
+      : 'qr_url' in auth
+        ? safeHTTPS(auth.qr_url)
+        : undefined
+    : undefined
+  useEffect(() => {
+    // Only hand off the initial focus; never override keyboard or pointer navigation.
+    if (uri && document.activeElement === initialCancelRef.current) officialLinkRef.current?.focus()
+  }, [uri])
+  useEffect(() => {
+    if (status === 'expired' || status === 'failed') retryRef.current?.focus()
+  }, [status])
+  function stopForDismiss() {
+    closing.current = true
     paused.current = true
-    setCancelling(true)
-    setError('')
+    stop.current()
+  }
+  function cancel() {
+    stopForDismiss()
     const value = current.current
-    try {
-      if (value && !['authorized', 'expired', 'failed', 'cancelled'].includes(value.auth.status)) {
+    onClose()
+    // Server cleanup must not keep the dialog open or report late errors after dismissal.
+    if (value && !['authorized', 'expired', 'failed', 'cancelled'].includes(value.auth.status)) {
+      void (async () => {
+        const options = { signal: AbortSignal.timeout(10000), sessionCheck: false }
         if (dws) {
-          const result = await api<DWSAuth>(
+          await api<DWSAuth>(
             `${dwsPath(value.connection)}/link/${encodeURIComponent(value.challenge!)}`,
-            { method: 'DELETE' },
+            { ...options, method: 'DELETE' },
           )
-          if (result.status === 'authorized') {
-            connectedCallback.current()
-            return
-          }
         } else {
           // A lost poll response may already have activated this connection.
-          const latest = await api<PlatformAuth>(`${connectionPath(value.connection)}/auth`)
-          if (latest.status === 'authorized') {
-            connectedCallback.current()
-            return
+          const latest = await api<PlatformAuth>(
+            `${connectionPath(value.connection)}/auth`,
+            options,
+          )
+          if (latest.status !== 'authorized') {
+            await api(connectionPath(value.connection) + '/', { ...options, method: 'DELETE' })
           }
-          await api(connectionPath(value.connection) + '/', { method: 'DELETE' })
         }
-      }
-      onClose()
-    } catch (error) {
-      setError(errorMessage(error))
-    } finally {
-      setCancelling(false)
+      })().catch(() => {
+        // The page refresh on close reconciles connection state; a dismissed dialog stays dismissed.
+      })
+    }
+  }
+  async function copyLink() {
+    if (!uri) return
+    try {
+      await navigator.clipboard.writeText(uri)
+      if (!closing.current) setCopyMessage('安全授权链接已复制。')
+    } catch {
+      if (!closing.current) setCopyMessage('未能复制，请使用上方官方授权链接。')
     }
   }
   return (
     <Modal
       title={`连接${name}`}
-      onClose={() => void cancel()}
-      busy={cancelling || (!challenge && !error)}
+      onClose={cancel}
+      closeHandleRef={modalRef}
+      onDismissStart={stopForDismiss}
+      descriptionId={descriptionId}
+      initialFocusRef={initialCancelRef}
     >
-      <p className="modal-description">
+      <p id={descriptionId} className="modal-description">
         {dws
           ? '使用钉钉扫码，或打开官方授权页完成连接。'
-          : `请使用${name} App 扫描下方二维码，并确认登录。`}
+          : uri
+            ? `打开${name}官方授权页，或使用另一台设备上的${name} App 扫描下方二维码，并确认登录。`
+            : `请使用另一台设备上的${name} App 扫描下方二维码，并确认登录；此授权方式需要第二台设备。`}
       </p>
       <div className={`qr-box ${terminal ? 'qr-expired' : ''}`}>
         {image ? (
@@ -217,15 +298,19 @@ export default function AuthDialog({
           </div>
         )}
       </div>
-      {auth && !terminal && (
-        <div className="auth-status">
-          <span className="pulse-dot" />
-          {auth.status === 'scanned' ? '已扫码，请在手机上确认' : '等待扫码授权'}
-          {expires > 0 && Number.isFinite(expires) && (
-            <span className="muted">
-              {Math.floor(expires / 60)}:{String(expires % 60).padStart(2, '0')}
-            </span>
-          )}
+      <div
+        className="auth-status"
+        role="status"
+        aria-label="授权状态"
+        aria-live="polite"
+        aria-atomic="true"
+      >
+        <span className="pulse-dot" aria-hidden="true" />
+        {statusMessage}
+      </div>
+      {auth && !terminal && status !== 'authorized' && expires > 0 && Number.isFinite(expires) && (
+        <div className="muted" aria-hidden="true">
+          {Math.floor(expires / 60)}:{String(expires % 60).padStart(2, '0')}
         </div>
       )}
       {auth && 'user_code' in auth && auth.user_code && !terminal && (
@@ -235,34 +320,44 @@ export default function AuthDialog({
         </div>
       )}
       {uri && !terminal && (
-        <a
-          className="button button-secondary full-width"
-          href={uri}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          打开钉钉官方授权页 <ArrowUpRight size={16} />
-        </a>
+        <>
+          <a
+            ref={officialLinkRef}
+            className="button button-secondary full-width"
+            href={uri}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            打开{name}官方授权页（新窗口） <ArrowUpRight size={16} aria-hidden="true" />
+          </a>
+          <button type="button" className="text-button" onClick={() => void copyLink()}>
+            复制{name}安全授权链接
+          </button>
+          {copyMessage && <Notice tone="info">{copyMessage}</Notice>}
+        </>
       )}
       {error && <Notice tone="error">{error}</Notice>}
       {(terminal || error) && (
         <button
+          ref={retryRef}
           type="button"
           className="button button-primary full-width"
           onClick={() => setRetry((value) => value + 1)}
-          disabled={cancelling}
         >
           <RotateCw size={16} />
           {error && !terminal && challenge ? '继续检查授权' : '重新获取'}
         </button>
       )}
+      <button
+        ref={initialCancelRef}
+        type="button"
+        className={`button ${!challenge && !error ? 'button-primary' : 'button-secondary'} full-width`}
+        onClick={() => modalRef.current?.close()}
+      >
+        取消连接
+      </button>
       {error && challenge && (
-        <button
-          type="button"
-          className="text-button auth-dismiss"
-          onClick={onClose}
-          disabled={cancelling}
-        >
+        <button type="button" className="text-button auth-dismiss" onClick={() => modalRef.current?.close()}>
           暂时关闭，稍后继续连接
         </button>
       )}

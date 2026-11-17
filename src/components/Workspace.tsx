@@ -1,5 +1,6 @@
 import {
   useEffect,
+  useId,
   useLayoutEffect,
   useRef,
   useState,
@@ -24,7 +25,7 @@ import {
   House,
   Layers3,
   LogOut,
-  Plus,
+  Eraser,
   Send,
   Settings2,
   Target,
@@ -45,13 +46,17 @@ import {
   type MockCourse,
 } from '../data/mock'
 import PixelComputer from './PixelComputer'
-import { Brand, Modal, Notice } from './UI'
-import '../workspace.css'
+import { Brand, Modal, Notice, type ModalHandle } from './UI'
 
 type Page = 'home' | 'schedule' | 'profile'
 type Message = { id: number; role: 'user' | 'assistant'; text: string; sources?: string[] }
 type ChatAnchor = { x: number; y: number }
-type ChatMorph = { launcherWidth: number; launcherHeight: number; panelWidth: number; panelHeight: number }
+type ChatMorph = {
+  launcherWidth: number
+  launcherHeight: number
+  panelWidth: number
+  panelHeight: number
+}
 type DragState = { pointerId: number; offsetX: number; offsetY: number }
 type LauncherDragState = DragState & { startX: number; startY: number; moved: boolean }
 const questionIcons = { calendar: CalendarDays, book: BookOpen, trend: TrendingUp, target: Target }
@@ -63,15 +68,11 @@ const navigation = [
 
 function Module({
   title,
-  subtitle,
   children,
   className = '',
   action,
 }: {
-  number: string
   title: string
-  subtitle: string
-  label?: string
   children: ReactNode
   className?: string
   action?: ReactNode
@@ -80,8 +81,7 @@ function Module({
     <section className={`study-module ${className}`}>
       <header className="module-heading">
         <h2>
-          <span className="pixel-type">{title}</span>
-          <span className="module-subtitle">{subtitle}</span>
+          <span className="module-subtitle">{title}</span>
         </h2>
         {action}
       </header>
@@ -96,7 +96,7 @@ function ScheduleList({ detailed = false }: { detailed?: boolean }) {
       {schedule.map((item, i) => (
         <li key={item.id} className={i === 0 ? 'next-class' : ''}>
           <span className="timeline-dot" />
-          <time>
+          <time dateTime={`${academicSnapshot.date}T${item.start}:00+08:00`}>
             {item.start}
             <span> — </span>
             {item.end}
@@ -124,6 +124,10 @@ export default function Workspace({
   onSettings: () => void
 }) {
   const [page, setPage] = useState<Page>('home')
+  const [pageAnnouncement, setPageAnnouncement] = useState('')
+  const pageHeadingRefs = useRef<Partial<Record<Page, HTMLHeadingElement | null>>>({})
+  const previousPage = useRef<Page>('home')
+  const navigationVersion = useRef(0)
   const [clock, setClock] = useState(() => new Date())
   const [expanded, setExpanded] = useState(false)
   const [course, setCourse] = useState<MockCourse>()
@@ -135,10 +139,26 @@ export default function Workspace({
   const [chatReady, setChatReady] = useState(false)
   const [chatMorph, setChatMorph] = useState<ChatMorph>()
   const [chatAnchor, setChatAnchor] = useState<ChatAnchor>()
+  const [chatPlacement, setChatPlacement] = useState<{ right: number; bottom: number }>()
   const [notice, setNotice] = useState('')
   const [reminders, setReminders] = useState(true)
   const [selectedDay, setSelectedDay] = useState(0)
+  const [chatSession, setChatSession] = useState(0)
+  const [confirmClear, setConfirmClear] = useState(false)
+  const courseDescriptionId = useId()
+  const clearDescriptionId = useId()
+  const courseModalRef = useRef<ModalHandle>(null)
+  const clearModalRef = useRef<ModalHandle>(null)
+  const courseActionRef = useRef<HTMLButtonElement>(null)
+  const keepChatRef = useRef<HTMLButtonElement>(null)
+  const focusNewChat = useRef(false)
   const inputRef = useRef<HTMLTextAreaElement>(null)
+  useEffect(() => {
+    if (!confirmClear && focusNewChat.current) {
+      focusNewChat.current = false
+      inputRef.current?.focus()
+    }
+  }, [confirmClear])
   const conversationRef = useRef<HTMLDivElement>(null)
   const chatWindowRef = useRef<HTMLElement>(null)
   const chatLauncherRef = useRef<HTMLButtonElement>(null)
@@ -158,8 +178,9 @@ export default function Workspace({
       hourCycle: 'h23',
     }).format(clock),
   )
-  const greeting = hours < 12 ? 'GOOD MORNING' : hours < 18 ? 'GOOD AFTERNOON' : 'GOOD EVENING'
+  const greeting = hours < 12 ? '早上好' : hours < 18 ? '下午好' : '晚上好'
   const date = new Intl.DateTimeFormat('zh-CN', {
+    year: 'numeric',
     month: 'long',
     day: 'numeric',
     weekday: 'long',
@@ -179,6 +200,14 @@ export default function Workspace({
     }
   }, [])
   useEffect(() => {
+    if (previousPage.current === page) return
+    previousPage.current = page
+    window.scrollTo({ top: 0, behavior: 'instant' })
+    if (page === 'home') document.getElementById('dashboard')?.scrollTo({ top: 0, behavior: 'instant' })
+    pageHeadingRefs.current[page]?.focus({ preventScroll: true })
+    setPageAnnouncement(`已切换到${navigation.find((item) => item.id === page)?.label}`)
+  }, [page])
+  useEffect(() => {
     const el = conversationRef.current
     if (el) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
   }, [messages, replying, chatOpen])
@@ -194,12 +223,31 @@ export default function Workspace({
       panelWidth: panel.offsetWidth,
       panelHeight: panel.offsetHeight,
     })
-  }, [chatOpen, chatAnchor])
+    const place = () => {
+      if (window.matchMedia('(max-width: 760px)').matches) return
+      const origin = chatLauncherRef.current!.getBoundingClientRect()
+      const width = panel.offsetWidth
+      const height = Math.min(panel.offsetHeight, window.innerHeight - 24)
+      // Keep the launcher in place. Prefer downward expansion when there is not enough room above.
+      const top = origin.bottom - height >= 12
+        ? origin.bottom - height
+        : Math.min(origin.top, window.innerHeight - height - 12)
+      const left = Math.max(12, Math.min(origin.right - width, window.innerWidth - width - 12))
+      const next = { right: window.innerWidth - left - width, bottom: window.innerHeight - Math.max(12, top) - height }
+      setChatPlacement((current) => current?.right === next.right && current?.bottom === next.bottom ? current : next)
+    }
+    place()
+    window.addEventListener('resize', place)
+    return () => window.removeEventListener('resize', place)
+  }, [chatOpen, chatAnchor, chatSession])
   useEffect(() => {
+    const version = navigationVersion.current
     if (!chatOpen) {
       if (!restoreChatFocus.current) return
       restoreChatFocus.current = false
-      const frame = requestAnimationFrame(() => chatLauncherRef.current?.focus())
+      const frame = requestAnimationFrame(() => {
+        if (version === navigationVersion.current) chatLauncherRef.current?.focus()
+      })
       return () => cancelAnimationFrame(frame)
     }
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -210,10 +258,12 @@ export default function Workspace({
       inputRef.current?.focus({ preventScroll: true })
     } else {
       revealTimer = setTimeout(() => setChatReady(true), 520)
-      focusTimer = setTimeout(() => inputRef.current?.focus({ preventScroll: true }), 700)
+      focusTimer = setTimeout(() => {
+        if (version === navigationVersion.current) inputRef.current?.focus({ preventScroll: true })
+      }, 700)
     }
     const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') closeChat()
+      if (event.key === 'Escape' && !document.querySelector('dialog[open]')) closeChat()
     }
     window.addEventListener('keydown', closeOnEscape)
     return () => {
@@ -221,11 +271,11 @@ export default function Workspace({
       clearTimeout(focusTimer)
       window.removeEventListener('keydown', closeOnEscape)
     }
-  }, [chatOpen])
+  }, [chatOpen, chatSession])
   useEffect(() => {
     if (!chatOpen) return
     const closeOnOutsidePointer = (event: PointerEvent) => {
-      if (window.matchMedia('(max-width: 760px)').matches) return
+      if (window.matchMedia('(max-width: 760px)').matches || document.querySelector('dialog[open]')) return
       const target = event.target
       if (!(target instanceof Node) || chatWindowRef.current?.contains(target)) return
       closeChat()
@@ -256,10 +306,9 @@ export default function Workspace({
   useEffect(() => {
     if (!chatAnchor) return
     const keepInViewport = () => {
-      const panel = chatWindowRef.current
       const launcher = chatLauncherRef.current
-      const width = chatOpen && panel ? panel.offsetWidth : launcher?.offsetWidth || 64
-      const height = chatOpen && panel ? panel.offsetHeight : launcher?.offsetHeight || 58
+      const width = launcher?.offsetWidth || 64
+      const height = launcher?.offsetHeight || 58
       setChatAnchor((current) => {
         if (!current) return current
         const next = {
@@ -274,13 +323,18 @@ export default function Workspace({
   }, [chatOpen, chatAnchor])
 
   function navigate(next: Page) {
+    if (next === page) return
+    navigationVersion.current++
+    restoreChatFocus.current = false
     setPage(next)
   }
   function openChat() {
+    setChatSession((value) => value + 1)
     clearTimeout(closeTimer.current)
     setChatClosing(false)
     setChatReady(false)
     setChatMorph(undefined)
+    setChatPlacement(undefined)
     if (!chatAnchor) {
       const launcher = chatLauncherRef.current
       const rect = launcher?.getBoundingClientRect()
@@ -415,11 +469,16 @@ export default function Workspace({
     setReplying(false)
     setMessages([])
     setInput('')
-    inputRef.current?.focus()
+    focusNewChat.current = true
+    setConfirmClear(false)
+  }
+  function requestNewChat() {
+    if (messages.length || pendingReply.current) setConfirmClear(true)
+    else inputRef.current?.focus()
   }
 
   return (
-    <div className="study-os">
+    <div className={`study-os ${page === 'home' ? 'is-home' : ''}`}>
       <a className="skip-link" href="#dashboard">
         跳到工作台
       </a>
@@ -453,26 +512,38 @@ export default function Workspace({
       </header>
 
       <div className="workspace-meta">
-        <strong>本地示例数据</strong>
+        <strong>
+          本地示例快照 · <time dateTime={academicSnapshot.date}>{academicSnapshot.date}</time>
+        </strong>
         <span>
-          {academicSnapshot.semester} <span className="meta-divider">/</span> {academicSnapshot.week}
+          {academicSnapshot.semester} <span className="meta-divider">/</span>{' '}
+          {academicSnapshot.week}
         </span>
       </div>
+      <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+        {pageAnnouncement}
+      </p>
       <main className={`workspace-main ${page === 'home' ? '' : 'single-view'}`}>
         <div className="dashboard-scroll" id="dashboard" tabIndex={-1} hidden={page !== 'home'}>
           <section className="welcome-panel">
             <PixelComputer />
             <div className="welcome-copy">
-              <h1 className="pixel-type">
-                {greeting}, {name.toUpperCase()}!<span className="cursor-block" />
+              <h1
+                ref={(heading) => {
+                  pageHeadingRefs.current.home = heading
+                }}
+                className="pixel-type"
+                tabIndex={-1}
+              >
+                {greeting}，{name}！<span className="cursor-block" />
               </h1>
               <div className="welcome-datetime">
-                <span>今天是 {date}</span>
+                <span>当前日期 {date}</span>
                 <span className="welcome-time-divider">·</span>
                 <time dateTime={clock.toISOString()}>{time}</time>
                 <span className="welcome-time-zone">北京时间</span>
               </div>
-              <p>你的学业概览</p>
+              <p>示例学业概览 · {academicSnapshot.date} 快照，与当前时钟分开</p>
             </div>
             <svg className="mountain-art" viewBox="0 0 300 130" aria-hidden="true">
               <defs>
@@ -489,10 +560,7 @@ export default function Workspace({
           </section>
 
           <Module
-            number="01"
-            title="OVERVIEW"
-            subtitle="学业总览"
-            label="ACADEMIC STATUS"
+            title="学业总览"
             className="overview-module"
           >
             <div className="overview-grid">
@@ -500,23 +568,23 @@ export default function Workspace({
                 {
                   icon: ClipboardCheck,
                   value: academicSnapshot.pendingTasks,
-                  label: '待完成任务',
+                  label: '示例待完成任务',
                   color: 'blue',
                 },
                 {
                   icon: CalendarDays,
-                  value: academicSnapshot.todayClasses,
-                  label: '今日课程',
+                  value: academicSnapshot.scheduledClasses,
+                  label: '示例日课程',
                   color: 'sand',
                 },
-                { icon: Layers3, value: courses.length, label: '进行中课程', color: 'green' },
+                { icon: Layers3, value: courses.length, label: '示例进行中课程', color: 'green' },
               ].map(({ icon: Icon, value, label, color }) => (
                 <div className={`stat stat-${color}`} key={label}>
                   <span className="stat-icon">
                     <Icon size={29} strokeWidth={1.5} />
                   </span>
                   <div>
-                    <strong className="pixel-type">{String(value).padStart(2, '0')}</strong>
+                    <strong>{String(value).padStart(2, '0')}</strong>
                     <span>{label}</span>
                   </div>
                 </div>
@@ -526,10 +594,7 @@ export default function Workspace({
 
           <div className="dashboard-middle">
             <Module
-              number="02"
-              title="TODAY’S SCHEDULE"
-              subtitle="今日安排"
-              label="TODAY"
+              title="示例安排"
               className="today-module"
               action={
                 <button
@@ -547,10 +612,7 @@ export default function Workspace({
               </footer>
             </Module>
             <Module
-              number="03"
-              title="AGENT BRIEF"
-              subtitle="学业简报"
-              label="NOTICE"
+              title="示例学业简报"
               className="brief-module"
             >
               <div className="brief-card">
@@ -572,10 +634,7 @@ export default function Workspace({
           </div>
 
           <Module
-            number="04"
-            title="COURSE STATUS"
-            subtitle="我的课程"
-            label="PROGRESS"
+            title="示例课程"
             className="courses-module"
           >
             <div className="course-table" role="group" aria-label="课程学习进度">
@@ -590,12 +649,13 @@ export default function Workspace({
                   key={c.id}
                   onClick={() => setCourse(c)}
                   aria-label={`查看${c.name}详情`}
+                  aria-describedby={`course-progress-${c.id} course-task-${c.id}`}
                 >
                   <span className="course-name">
                     <span className={`course-code code-${c.color}`}>{c.code}</span>
                     <strong>{c.name}</strong>
                   </span>
-                  <span className="progress-cell">
+                  <span className="progress-cell" id={`course-progress-${c.id}`}>
                     <span
                       className="segmented-progress"
                       role="progressbar"
@@ -608,12 +668,14 @@ export default function Workspace({
                     </span>
                     <b>{c.progress}%</b>
                   </span>
-                  <span className="course-task">
+                  <span className="course-task" id={`course-task-${c.id}`}>
                     {c.due ? (
                       <>
                         <span className="task-dot">·</span>
-                        {c.task}
-                        <small>{c.due}</small>
+                        <span className="course-task-name">{c.task}</span>
+                        <small>
+                          示例截止 <time dateTime={c.due}>{c.due}</time>
+                        </small>
                         {c.id === 'drawing' && <CircleAlert size={14} className="urgent-icon" />}
                       </>
                     ) : (
@@ -640,8 +702,10 @@ export default function Workspace({
                 '--morph-from-height': `${chatMorph.launcherHeight}px`,
                 '--morph-to-width': `${chatMorph.panelWidth}px`,
                 '--morph-to-height': `${chatMorph.panelHeight}px`,
-                right: chatAnchor ? window.innerWidth - chatAnchor.x : undefined,
-                bottom: chatAnchor ? window.innerHeight - chatAnchor.y : undefined,
+                '--morph-offset-x': `${chatAnchor && chatPlacement ? chatAnchor.x - (window.innerWidth - chatPlacement.right) : 0}px`,
+                '--morph-offset-y': `${chatAnchor && chatPlacement ? chatAnchor.y - (window.innerHeight - chatPlacement.bottom) : 0}px`,
+                right: chatPlacement?.right ?? (chatAnchor ? window.innerWidth - chatAnchor.x : undefined),
+                bottom: chatPlacement?.bottom ?? (chatAnchor ? window.innerHeight - chatAnchor.y : undefined),
               } as CSSProperties
             }
           />
@@ -653,12 +717,12 @@ export default function Workspace({
             className={`assistant-console chat-window ${chatReady ? 'is-ready' : ''} ${chatClosing ? 'is-closing' : ''}`}
             aria-label="Academic Assistant 对话区域"
             style={
-              chatAnchor
+              chatPlacement ?? (chatAnchor
                 ? {
                     right: window.innerWidth - chatAnchor.x,
                     bottom: window.innerHeight - chatAnchor.y,
                   }
-                : undefined
+                : undefined)
             }
           >
           <header
@@ -669,9 +733,8 @@ export default function Workspace({
             onPointerCancel={endChatDrag}
           >
             <GripHorizontal className="chat-drag-icon" size={18} aria-hidden="true" />
-            <span className="console-prompt">›_</span>
             <h2 className="pixel-type">
-              ACADEMIC ASSISTANT <span>学习助手</span>
+              Academic Assistant <span>学习助手</span>
             </h2>
 
             <button
@@ -725,7 +788,6 @@ export default function Workspace({
                     <div className="message-author">
                       {m.role === 'assistant' ? (
                         <>
-                          <span className="message-avatar">a_</span>
                           <strong>Academic Assistant</strong>
                           <span className="local-label">本地演示</span>
                         </>
@@ -735,7 +797,6 @@ export default function Workspace({
                             <UserRound size={13} />
                           </span>
                           <strong>{name}</strong>
-                          <span className="mono">YOU</span>
                         </>
                       )}
                     </div>
@@ -766,19 +827,18 @@ export default function Workspace({
           <div className="console-bottom">
             <div className="console-tools">
               <span>
-                <span className="status-square" /> 学习模式 <span className="tool-divider">/</span>{' '}
-                本地演示
+                  <span className="status-square" /> 学习模式{' '}
+                  <span className="tool-divider">/</span> 本地演示
               </span>
-              <button disabled={!messages.length} onClick={clearChat}>
-                <Plus size={13} />
-                新对话
+              <button disabled={!messages.length} onClick={requestNewChat}>
+                <Eraser size={13} />
+                清空并新建
               </button>
             </div>
             <form className="chat-composer" onSubmit={submit}>
               <label htmlFor="assistant-input" className="sr-only">
                 向学习助手提问
               </label>
-              <span className="input-prompt">›</span>
               <textarea
                 ref={inputRef}
                 id="assistant-input"
@@ -827,8 +887,12 @@ export default function Workspace({
         {page === 'schedule' && (
           <section className="standalone-page">
             <header className="standalone-title">
-              <h1 className="pixel-type">日程</h1>
-              <span className="local-page-badge">本地示例</span>
+              <h1
+                ref={(heading) => { pageHeadingRefs.current.schedule = heading }}
+                className="pixel-type"
+                tabIndex={-1}
+              >日程</h1>
+              <span className="local-page-badge">示例快照 · {academicSnapshot.date}</span>
             </header>
             <div className="schedule-dates">
               {scheduleDays.map((day, i) => (
@@ -843,7 +907,7 @@ export default function Workspace({
                 </button>
               ))}
             </div>
-            <Module number="01" title="DAILY TIMELINE" subtitle="每日时间线" label="SCHEDULE">
+            <Module title="示例时间线">
               {selectedDay === 0 ? (
                 <ScheduleList detailed />
               ) : (
@@ -854,7 +918,10 @@ export default function Workspace({
                 </div>
               )}
             </Module>
-            <button className="button button-secondary standalone-action" onClick={() => navigate('home')}>
+            <button
+              className="button button-secondary standalone-action"
+              onClick={() => navigate('home')}
+            >
               <ArrowLeft size={15} />
               返回工作台
             </button>
@@ -863,11 +930,15 @@ export default function Workspace({
         {page === 'profile' && (
           <section className="standalone-page profile-page">
             <header className="standalone-title">
-              <h1 className="pixel-type">我的</h1>
-              <span className="local-page-badge">本地示例</span>
+              <h1
+                ref={(heading) => { pageHeadingRefs.current.profile = heading }}
+                className="pixel-type"
+                tabIndex={-1}
+              >我的</h1>
+              <span className="local-page-badge">示例快照 · {academicSnapshot.date}</span>
             </header>
             <div className="profile-card">
-              <span className="profile-avatar pixel-type">{name.slice(0, 1).toUpperCase()}</span>
+              <span className="profile-avatar">{name.slice(0, 1).toUpperCase()}</span>
               <div>
                 <h2>{name}</h2>
                 <p>
@@ -880,7 +951,7 @@ export default function Workspace({
                 学习者
               </span>
             </div>
-            <Module number="01" title="PREFERENCES" subtitle="偏好与设置" label="PERSONAL">
+            <Module title="偏好与设置">
               <div className="preference-row">
                 <div>
                   <strong>学业提醒</strong>
@@ -951,13 +1022,22 @@ export default function Workspace({
         <span className="assistant-launcher-label">学习助手</span>
         {!!messages.length && <span className="assistant-launcher-count">{messages.length}</span>}
       </button>
+      {confirmClear && (
+        <Modal title="清空并新建对话？" closeHandleRef={clearModalRef} onClose={() => setConfirmClear(false)} descriptionId={clearDescriptionId} initialFocusRef={keepChatRef}>
+          <p id={clearDescriptionId} className="modal-description">当前消息将被清空，正在生成的回复也会停止。保留对话可继续查看现有消息。</p>
+          <div className="modal-actions">
+            <button ref={keepChatRef} type="button" className="button button-secondary" onClick={() => clearModalRef.current?.close()}>保留对话</button>
+            <button type="button" className="button button-primary" onClick={() => clearModalRef.current?.close(clearChat)}>确认清空并新建</button>
+          </div>
+        </Modal>
+      )}
       {course && (
-        <Modal title={`${course.name} / ${course.task}`} onClose={() => setCourse(undefined)}>
+        <Modal title={`${course.name} / ${course.task}`} closeHandleRef={courseModalRef} onClose={() => setCourse(undefined)} descriptionId={courseDescriptionId} initialFocusRef={courseActionRef}>
           <div className="course-detail">
             <span className={`course-code code-${course.color}`}>{course.code}</span>
-            <span className="mono">{course.subtitle}</span>
+            <span>{course.subtitle}</span>
             <h3>{course.task}</h3>
-            <p>{course.detail}</p>
+            <p id={courseDescriptionId}>{course.detail}</p>
             <dl>
               <div>
                 <dt>课程教师</dt>
@@ -975,19 +1055,20 @@ export default function Workspace({
                 <div>
                   <dt>示例截止日期</dt>
                   <dd>
-                    {academicSnapshot.date.slice(0, 4)}-{course.due}
+                    <time dateTime={course.due}>{course.due}</time>
                   </dd>
                 </div>
               )}
             </dl>
-            <p className="detail-note">本地示例数据 · 未连接真实课程</p>
+            <p className="detail-note">{academicSnapshot.date} 示例快照 · 未连接真实课程</p>
             <button
+              ref={courseActionRef}
               className="button button-primary"
-              onClick={() => {
+              onClick={() => courseModalRef.current?.close(() => {
                 setCourse(undefined)
                 openChat()
                 send(`帮我安排${course.name}的${course.task}任务。`)
-              }}
+              })}
             >
               和助手一起安排
               <ArrowRight size={15} />

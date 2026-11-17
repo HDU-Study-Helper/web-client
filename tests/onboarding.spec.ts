@@ -352,6 +352,64 @@ test('完整向导：钉钉授权、保留旧群、分页选群、教务连接�
   expect(state.requests.filter((r) => r.path.endsWith('/sync'))).toHaveLength(1)
 })
 
+test('手机十二节作息双行编辑，删除可键盘撤销并保留时间', async ({ page }) => {
+  await fixture(page, { authenticated: true, activeSchool: true })
+  const periods = Array.from({ length: 12 }, (_, index) => {
+    const start = 480 + index * 55
+    const time = (minute: number) => `${String(Math.floor(minute / 60)).padStart(2, '0')}:${String(minute % 60).padStart(2, '0')}`
+    return { period: index + 1, start: time(start), end: time(start + 45) }
+  })
+  await setDraft(page, { ...draft, periods })
+  await page.goto('/')
+  for (const width of [320, 360, 390]) {
+    await page.setViewportSize({ width, height: 844 })
+    const rows = page.locator('.period-row')
+    await expect(rows).toHaveCount(12)
+    const geometry = await rows.first().evaluate((element) => {
+      const number = element.querySelector('.period-number')!.getBoundingClientRect()
+      const fields = Array.from(element.querySelectorAll('input')).map((field) => {
+        const rect = field.getBoundingClientRect()
+        return { y: rect.y, height: rect.height, width: rect.width, right: rect.right }
+      })
+      const actions = Array.from(element.querySelectorAll('button')).map((button) => {
+        const rect = button.getBoundingClientRect()
+        return { x: rect.x, right: rect.right, width: rect.width, height: rect.height }
+      })
+      return { numberBottom: number.bottom, fields, actions }
+    })
+    expect(geometry.fields[0].y).toBeGreaterThanOrEqual(geometry.numberBottom)
+    expect(geometry.fields[0].y).toBeCloseTo(geometry.fields[1].y, 0)
+    for (const field of geometry.fields) {
+      expect(field.height).toBeGreaterThanOrEqual(44)
+      expect(field.right).toBeLessThanOrEqual(width)
+    }
+    for (const action of geometry.actions) {
+      expect(action.width).toBeGreaterThanOrEqual(44)
+      expect(action.height).toBeGreaterThanOrEqual(44)
+    }
+    expect(geometry.actions[1].x - geometry.actions[0].right).toBeGreaterThanOrEqual(8)
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+  }
+  await page.getByLabel('第 2 节开始时间', { exact: true }).fill('09:00')
+  await page.getByRole('button', { name: '删除第 2 节', exact: true }).click()
+  await expect(page.locator('.period-row')).toHaveCount(11)
+  const undo = page.getByRole('button', { name: '撤销', exact: true })
+  await undo.focus()
+  await undo.press('Enter')
+  await expect(page.locator('.period-row')).toHaveCount(12)
+  await expect(page.getByLabel('第 2 节开始时间', { exact: true })).toHaveValue('09:00')
+  await expect(page.getByLabel('第 2 节结束时间', { exact: true })).toHaveValue(periods[1].end)
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('haa:setup:v1:fixture-student') || '{}'))
+  expect(saved.periods[1].start).toBe('09:00')
+  await page.clock.install()
+  await page.clock.pauseAt(new Date())
+  await page.getByRole('button', { name: '删除第 3 节', exact: true }).click()
+  await page.clock.fastForward(7900)
+  await expect(page.getByRole('button', { name: '撤销', exact: true })).toBeVisible()
+  await page.clock.fastForward(101)
+  await expect(page.getByRole('button', { name: '撤销', exact: true })).toHaveCount(0)
+})
+
 test('校历与重叠校验阻止错误导入，失败后保留草稿供重试', async ({ page }) => {
   const state = await fixture(page, { authenticated: true, activeSchool: true })
   await setDraft(page, { ...draft, step: 2, monday: '2026-09-08' })
@@ -392,8 +450,10 @@ test('授权过期与会话失效可恢复，不假报成功', async ({ page }) 
   )
   await page.goto('/')
   await page.getByRole('button', { name: '连接学习通', exact: true }).click()
-  await expect(page.getByText('二维码已失效')).toBeVisible()
+  await expect(page.getByText('二维码已失效', { exact: true })).toBeVisible()
   await page.getByRole('button', { name: '关闭弹窗' }).click()
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '刷新', exact: true })).toBeEnabled()
   await page.route('**/api/v1/platforms/connections', (route) =>
     route.fulfill({
       status: 401,
@@ -447,6 +507,8 @@ test('群发现失败不覆盖已有选择，初始读取失败禁止保存', as
   expect(
     state.requests.find((r) => r.path.endsWith('/groups') && r.method === 'PUT')?.body,
   ).toEqual({ groups: [{ id: 'retained', name: '已有课程群' }] })
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '选择群' })).toBeEnabled()
   await page.route('**/dws/connections/dws-fixture/groups', unavailable)
   await page.getByRole('button', { name: '选择群' }).click()
   await expect(page.getByRole('button', { name: '保存选择' })).toBeDisabled()

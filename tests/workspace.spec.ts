@@ -156,7 +156,8 @@ test('本地预览不请求 API，悬浮助手可打开、拖动并保留消息'
   await input.fill('我最近的学习进度怎么样？')
   await input.press('Enter')
   await expect(page.getByRole('log')).toContainText('高等数学  65%')
-  await page.getByRole('button', { name: '新对话' }).click()
+  await page.getByRole('button', { name: '清空并新建', exact: true }).click()
+  await page.getByRole('button', { name: '确认清空并新建', exact: true }).click()
   await expect(page.getByRole('log')).toHaveCount(0)
   await expect(page.getByText('留一点空间，给新的想法。')).toHaveCount(0)
   await expect(page.getByText('LESS NOISE. MORE FOCUS.')).toHaveCount(0)
@@ -240,6 +241,29 @@ test('320px 窄屏无全局横向溢出，主要操作保持可用', async ({ pa
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
 })
 
+test('手机关键触控操作均达到44px', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 844 })
+  await page.goto('/?demo=1')
+  for (const button of await page.locator('.os-navigation button').all()) {
+    const box = (await button.boundingBox())!
+    expect(box.width).toBeGreaterThanOrEqual(44)
+    expect(box.height).toBeGreaterThanOrEqual(44)
+  }
+  await page.getByRole('button', { name: '我的', exact: true }).click()
+  const toggle = page.getByRole('switch', { name: '学业提醒' })
+  const box = (await toggle.boundingBox())!
+  expect(box.width).toBeGreaterThanOrEqual(44)
+  expect(box.height).toBeGreaterThanOrEqual(44)
+  await toggle.click()
+  await expect(toggle).not.toBeChecked()
+  await page.getByRole('button', { name: '打开学习助手' }).click()
+  const close = page.getByRole('button', { name: '关闭学习助手' })
+  const closeBox = (await close.boundingBox())!
+  expect(closeBox.width).toBeGreaterThanOrEqual(44)
+  expect(closeBox.height).toBeGreaterThanOrEqual(44)
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+})
+
 test('手机软键盘收缩可视区域后输入框仍保持可见', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 })
   await page.addInitScript(() => {
@@ -286,16 +310,14 @@ test('桌面浮窗不随工作台滚动，手机助手铺满屏幕且可关闭',
   await page.goto('/?demo=1')
   await page.getByRole('button', { name: '查看全部 5 门课程' }).click()
   await page.getByRole('button', { name: '打开学习助手' }).click()
-  const dashboard = page.locator('#dashboard')
   const assistant = page.getByRole('region', { name: 'Academic Assistant 对话区域' })
   const input = page.getByRole('textbox', { name: '向学习助手提问' })
   await assistant.evaluate(async (element) => {
     await Promise.all(element.getAnimations().map((animation) => animation.finished))
   })
   const before = (await assistant.boundingBox())!
-  await dashboard.evaluate((el) => {
-    el.scrollTop = el.scrollHeight
-  })
+  await page.locator('.courses-module').evaluate((element) => { element.scrollTop = element.scrollHeight })
+  expect(await page.evaluate(() => window.scrollY)).toBe(0)
   expect((await assistant.boundingBox())!.y).toBe(before.y)
   await input.fill('帮我总结一下高等数学的重点。')
   await page.getByRole('button', { name: '发送消息' }).click()

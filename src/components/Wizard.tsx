@@ -22,7 +22,7 @@ import {
   ShieldCheck,
 } from 'lucide-react'
 import { activeConnection, api, connectionPath, dwsPath, errorMessage } from '../api'
-import { loadDraft, saveDraft, validatePeriods, validateTerm } from '../setup'
+import { loadDraft, saveDraft, validatePeriodFields, validateTermFields, type ValidationError } from '../setup'
 import type { Connection, Group, ImportResult, SetupDraft, Source, User } from '../types'
 import AuthDialog from './AuthDialog'
 import GroupDialog from './GroupDialog'
@@ -103,6 +103,30 @@ export default function Wizard({
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [fieldErrors, setFieldErrors] = useState<ValidationError[]>([])
+  const pendingFocus = useRef<string | undefined>(undefined)
+  function focusField(field: string) {
+    const target = document.getElementById(field)
+    target?.focus({ preventScroll: true })
+    target?.scrollIntoView({ block: 'center', behavior: 'instant' })
+  }
+  function showValidation(next: ValidationError[]) {
+    setFieldErrors(next)
+    if (next.length) {
+      pendingFocus.current = next[0].field
+      if (['academicYear', 'term', 'monday'].includes(next[0].field) && draft.step !== 2)
+        setDraft((current) => ({ ...current, step: 2 }))
+    }
+  }
+  const fieldProps = (field: string) => ({
+    id: field,
+    'aria-invalid': fieldErrors.some((item) => item.field === field) || undefined,
+    'aria-describedby': fieldErrors.some((item) => item.field === field) ? `${field}-error` : undefined,
+  })
+  const fieldMessage = (field: string) => {
+    const invalid = fieldErrors.find((item) => item.field === field)
+    return invalid ? <span className="field-error" id={`${field}-error`}>{invalid.message}</span> : null
+  }
   const [success, setSuccess] = useState('')
   const [storageFailed, setStorageFailed] = useState(false)
   const [auth, setAuth] = useState<string>()
@@ -171,7 +195,18 @@ export default function Wizard({
     setSuccess('')
   }, [draft.step, draft.completed])
 
+  useEffect(() => {
+    if (pendingFocus.current) {
+      focusField(pendingFocus.current)
+      pendingFocus.current = undefined
+    }
+  }, [fieldErrors, draft.step])
+
   function update(patch: Partial<SetupDraft>) {
+    const next = { ...draft, ...patch }
+    // Recheck only errors already exposed by submission, never untouched fields.
+    const remaining = [...validateTermFields(next), ...validatePeriodFields(next.periods)]
+    setFieldErrors((current) => remaining.filter((item) => current.some((old) => old.field === item.field)))
     setDraft((current) => ({ ...current, ...patch, completed: false, importResult: undefined }))
     setError('')
     setSuccess('')
@@ -209,11 +244,9 @@ export default function Wizard({
   }
   async function finish() {
     if (busy) return
-    const invalid = validateTerm(draft) || validatePeriods(draft.periods)
-    if (invalid) {
-      setError(invalid)
-      return
-    }
+    const invalid = [...validateTermFields(draft), ...validatePeriodFields(draft.periods)]
+    showValidation(invalid)
+    if (invalid.length) return
     setBusy(true)
     setError('')
     try {
@@ -251,11 +284,9 @@ export default function Wizard({
   }
   function forward() {
     if (draft.step === 2) {
-      const invalid = validateTerm(draft)
-      if (invalid) {
-        setError(invalid)
-        return
-      }
+      const invalid = validateTermFields(draft)
+      showValidation(invalid)
+      if (invalid.length) return
     }
     navigate(draft.step + 1)
   }
@@ -466,7 +497,7 @@ export default function Wizard({
               <>
                 <div className="step-topline">
                   <span className="step-progress">
-                    STEP <strong>0{draft.step + 1}</strong> / 04
+                    <strong>0{draft.step + 1}</strong> / 04
                   </span>
                 </div>
                 <div className="mobile-progress" aria-hidden="true">
@@ -502,6 +533,25 @@ export default function Wizard({
                     }
                   </p>
                 </div>
+                {fieldErrors.length > 0 && (
+                  <div className="notice notice-error" role="alert" aria-label="请检查以下字段">
+                    <strong>请修正以下问题后继续：</strong>
+                    <ul>
+                      {fieldErrors.map((item) => (
+                        <li key={item.field}>
+                          <a href={`#${item.field}`} onClick={(event) => {
+                            event.preventDefault()
+                            const step = ['academicYear', 'term', 'monday'].includes(item.field) ? 2 : 3
+                            if (draft.step !== step) {
+                              pendingFocus.current = item.field
+                              navigate(step)
+                            } else focusField(item.field)
+                          }}>{item.message}</a>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
                 {draft.step === 0 && (
                   <>
                     <div className="section-line">
@@ -627,7 +677,6 @@ export default function Wizard({
                       </span>
                       <div>
                         <strong>杭州电子科技大学</strong>
-                        <span>HANGZHOU DIANZI UNIVERSITY</span>
                       </div>
                       <span className="school-badge">统一身份认证</span>
                     </div>
@@ -734,6 +783,7 @@ export default function Wizard({
                       <label>
                         学年
                         <select
+                          {...fieldProps('academicYear')}
                           value={draft.academicYear}
                           disabled={busy}
                           onChange={(event) => update({ academicYear: Number(event.target.value) })}
@@ -754,10 +804,12 @@ export default function Wizard({
                               </option>
                             ))}
                         </select>
+                        {fieldMessage('academicYear')}
                       </label>
                       <label>
                         学期
                         <select
+                          {...fieldProps('term')}
                           value={draft.term}
                           disabled={busy}
                           onChange={(event) => update({ term: Number(event.target.value) })}
@@ -765,6 +817,7 @@ export default function Wizard({
                           <option value={1}>第一学期 · 秋季</option>
                           <option value={2}>第二学期 · 春季</option>
                         </select>
+                        {fieldMessage('term')}
                       </label>
                     </div>
                     <div className="form-section-title term-date-title">
@@ -773,12 +826,14 @@ export default function Wizard({
                     <label className="monday-label">
                       第一教学周的周一
                       <input
+                        {...fieldProps('monday')}
                         type="date"
                         value={draft.monday}
                         min={`${draft.academicYear}-01-01`}
                         max={`${draft.academicYear + 1}-12-31`}
                         onChange={(event) => update({ monday: event.target.value })}
                       />
+                      {fieldMessage('monday')}
                     </label>
                     <p className="field-hint">
                       请以学校公布的校历为准，不一定是报到或第一天上课的日期。
@@ -816,6 +871,7 @@ export default function Wizard({
                     </div>
                     <TimetableEditor
                       periods={draft.periods}
+                      errors={fieldErrors}
                       onChange={(periods) => update({ periods })}
                       disabled={busy}
                     />

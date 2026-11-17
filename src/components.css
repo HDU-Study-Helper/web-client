@@ -1,0 +1,315 @@
+/* Shared controls: one authoritative rule per selector and media context. */
+
+body {
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  background: var(--paper);
+}
+button {
+  font: inherit;
+  -webkit-tap-highlight-color: transparent;
+  cursor: pointer;
+  transition:
+    background 0.18s,
+    color 0.18s,
+    border-color 0.18s,
+    box-shadow 0.18s;
+  color: inherit;
+  border-radius: var(--radius-control);
+}
+input {
+  font: inherit;
+  -webkit-tap-highlight-color: transparent;
+  width: 100%;
+  height: 47px;
+  min-width: 0;
+  padding: 0 14px;
+  border: 1px solid #dfe5ee;
+  outline: none;
+  transition:
+    border-color 0.18s,
+    box-shadow 0.18s;
+  border-radius: var(--radius-control);
+  background: var(--surface-input);
+  border-color: #bfc0b6;
+  color: var(--ink);
+}
+select {
+  font: inherit;
+  -webkit-tap-highlight-color: transparent;
+  width: 100%;
+  height: 47px;
+  min-width: 0;
+  padding: 0 14px;
+  border: 1px solid #dfe5ee;
+  outline: none;
+  transition:
+    border-color 0.18s,
+    box-shadow 0.18s;
+  border-radius: var(--radius-control);
+  background: var(--surface-input);
+  border-color: #bfc0b6;
+  color: var(--ink);
+}
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+button:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 4px;
+}
+a:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 4px;
+}
+input::placeholder {
+  color: #a3abba;
+  font-size: 13px;
+}
+input:focus {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 2px #405b9614;
+}
+select:focus {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 2px #405b9614;
+}
+input:disabled {
+  background: #f6f7fa;
+}
+select:disabled {
+  background: #f6f7fa;
+}
+input[type='checkbox'] {
+  height: 17px;
+  width: 17px;
+  accent-color: var(--blue);
+  flex-shrink: 0;
+}
+input[type='time'] {
+  padding: 0 10px;
+}
+label {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  color: #3b485d;
+}
+fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  min-height: 44px;
+  border: 1px solid transparent;
+  padding: 0 21px;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  border-radius: var(--radius-control);
+  box-shadow: none;
+}
+.button-primary {
+  color: #fff;
+  background: var(--blue);
+  border: 1px solid #2f4573;
+  box-shadow: 2px 2px 0 #26375220;
+}
+.button-primary:hover:not(:disabled) {
+  background: var(--blue-hover);
+  box-shadow: 2px 2px 0 #26375230;
+}
+.button-secondary {
+  color: var(--blue);
+  background: var(--surface-secondary);
+  border-color: #aeb3b9;
+}
+.button-secondary:hover:not(:disabled) {
+  background: #eeeadf;
+  border-color: var(--blue);
+}
+.button-quiet {
+  background: transparent;
+  color: #6c788b;
+  padding-left: 0;
+}
+.button-quiet:hover:not(:disabled) {
+  color: var(--blue);
+}
+.text-button {
+  background: none;
+  border: 0;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--blue);
+}
+.text-button:hover:not(:disabled) {
+  color: var(--blue);
+}
+.icon-button {
+  border: 0;
+  background: transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #8591a4;
+  padding: 7px;
+  border-radius: 6px;
+}
+.icon-button:hover:not(:disabled) {
+  background: #eef2fa;
+  color: var(--blue);
+}
+.quiet-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: #7d8799;
+}
+.quiet-link:hover {
+  color: var(--blue);
+}
+.notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 12px 14px;
+  margin: 16px 0;
+  border-radius: var(--radius-control);
+  background: #eaeef2;
+  border: 1px solid #bdc6d2;
+  color: #405573;
+  font-size: 12px;
+  line-height: 1.7;
+}
+.notice > svg {
+  margin-top: 3px;
+}
+.notice > div {
+  flex: 1;
+  min-width: 0;
+}
+.notice .text-button {
+  color: inherit;
+  text-decoration: underline;
+  margin-left: 8px;
+}
+.notice-error {
+  background: #f8e9de;
+  color: var(--text-warning);
+  border-color: #bd816a;
+}
+.notice-success {
+  background: #edf0df;
+  border-color: #c1ccb0;
+  color: #4a6948;
+}
+.notice .icon-button {
+  padding: 2px;
+}
+.input-with-icon {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 0 14px;
+  border: 1px solid #dfe5ee;
+  transition:
+    border 0.18s,
+    box-shadow 0.18s;
+  color: #9aa4b5;
+  border-radius: var(--radius-control);
+  background: #fffcf4;
+  border-color: #b7b9ae;
+}
+.input-with-icon:focus-within {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 2px #405b9610;
+}
+.input-with-icon input {
+  border: 0;
+  padding: 0;
+  box-shadow: none;
+  height: 49px;
+  background: transparent;
+  border-radius: 0;
+  color: var(--ink);
+}
+.input-with-icon .icon-button {
+  padding: 5px;
+  margin-right: -5px;
+}
+.modal {
+  padding: 27px 30px;
+  max-width: 470px;
+  width: calc(100% - 40px);
+  max-height: calc(100dvh - 50px);
+  color: #35435a;
+  overflow-y: auto;
+  background: var(--paper);
+  border: 1px solid #6e7988;
+  border-radius: var(--radius-modal);
+  box-shadow:
+    5px 5px 0 #18283f24,
+    0 20px 80px #18283f20;
+}
+.modal::backdrop {
+  background: #17263e66;
+  backdrop-filter: blur(2px);
+}
+.modal[open] { animation: modal-in 220ms cubic-bezier(.2, .8, .2, 1) both; }
+.modal[open]::backdrop { animation: modal-backdrop-in 220ms ease-out both; }
+.modal[open][data-closing] { animation: modal-out 160ms cubic-bezier(.4, 0, 1, 1) both; }
+.modal[open][data-closing]::backdrop { animation: modal-backdrop-out 160ms ease-in both; }
+@keyframes modal-in { from { opacity: 0; transform: translateY(8px) scale(.98); } to { opacity: 1; transform: none; } }
+@keyframes modal-out { from { opacity: 1; transform: none; } to { opacity: 0; transform: translateY(6px) scale(.985); } }
+@keyframes modal-backdrop-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes modal-backdrop-out { from { opacity: 1; } to { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .modal[open], .modal[open]::backdrop { animation: none; }
+}
+.modal-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 17px;
+}
+.modal-heading h2 {
+  font-weight: 600;
+  font-size: 17px;
+}
+.modal .button {
+  font-size: 11px;
+}
+@media (max-width: 420px) {
+  .modal {
+    padding: 24px 21px;
+    width: calc(100% - 30px);
+  }
+  .modal-heading h2 {
+    font-size: 17px;
+  }
+}::selection {
+  background: #d7dfec;
+  color: var(--ink);
+}textarea {
+  color: inherit;
+}
+.input-with-icon > svg {
+  color: #687581;
+}

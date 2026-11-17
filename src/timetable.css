@@ -1,0 +1,38 @@
+/* Timetable fields keep their labels in the narrow two-row layout. */
+.timetable-editor .period-time-field { min-width: 0; }
+.timetable-editor .period-time-field > span:not(.field-error) { display: none; }
+.timetable-editor .period-time-field > .field-error { display: block; }
+.timetable-editor .period-actions { display: flex; gap: 8px; }
+.timetable-editor .period-actions .icon-button { min-width: 44px; min-height: 44px; padding: 10px; }
+.timetable-editor .period-delete { color: var(--text-warning); }
+.timetable-editor .period-undo { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 12px; margin-top: 12px; background: var(--light-blue); color: var(--text-primary); }
+.timetable-editor .period-undo button { min-height: 44px; min-width: 44px; }
+.timetable-editor .periods-table-header,
+.timetable-editor .period-row { grid-template-columns: minmax(60px, .8fr) minmax(0, 1fr) minmax(0, 1fr) 96px; }
+@media (max-width: 740px) {
+  .timetable-editor .generator-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .timetable-editor .generator-fields > button { grid-column: 1 / -1; min-height: 44px; }
+  .timetable-editor .generator-fields label,
+  .timetable-editor .generator-fields input { font-size: 14px; min-width: 0; }
+  .timetable-editor .generator-fields input { min-height: 44px; }
+  .timetable-editor .periods-table { background: transparent; border: 0; }
+  .timetable-editor .periods-table-header { display: none; }
+  .timetable-editor .period-row {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-areas: 'number actions' 'start end';
+    gap: 12px 10px;
+    padding: 12px;
+    margin-bottom: 12px;
+    border: 1px solid var(--line);
+    background: var(--paper);
+  }
+  .timetable-editor .period-number { grid-area: number; font-size: 14px; }
+  .timetable-editor .period-number > span { display: none; }
+  .timetable-editor .period-actions { grid-area: actions; justify-self: end; gap: 8px; }
+  .timetable-editor .period-time-field { display: flex; flex-direction: column; gap: 6px; font-size: 12px; }
+  .timetable-editor .period-time-field:nth-child(2) { grid-area: start; }
+  .timetable-editor .period-time-field:nth-child(3) { grid-area: end; }
+  .timetable-editor .period-time-field > span { display: block; }
+  .timetable-editor .period-time-field input { width: 100%; min-width: 0; height: 44px; padding: 0 6px; font-size: 14px; }
+}

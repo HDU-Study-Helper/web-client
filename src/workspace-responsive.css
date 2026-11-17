@@ -1,0 +1,238 @@
+/* Workspace-only overrides. Loaded after the shared workspace rules. */
+.study-os .workspace-meta {
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  line-height: 1.6;
+}
+
+.study-os .workspace-meta > strong,
+.study-os .workspace-meta > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.study-os .standalone-page .schedule-dates {
+  flex-wrap: wrap;
+}
+
+.study-os .standalone-page .schedule-dates > button {
+  flex: 1 1 160px;
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.study-os .course-table .course-task {
+  display: flex;
+  flex-wrap: wrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.6;
+}
+
+.study-os .course-table .course-task small {
+  margin-left: 0;
+  font-size: 12px;
+}
+
+.study-os .course-table .course-task small time {
+  white-space: nowrap;
+}
+
+@media (max-width: 1100px) {
+  .study-os .workspace-main .dashboard-middle {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+  }
+
+  .study-os .study-module .module-heading {
+    gap: 8px;
+    min-height: 44px;
+    padding-block: 8px;
+  }
+
+  .study-os .study-module .module-heading h2 {
+    flex-wrap: wrap;
+    white-space: normal;
+    gap: 4px 8px;
+    overflow-wrap: anywhere;
+    line-height: 1.5;
+  }
+
+  .study-os .study-module .module-heading .pixel-type {
+    font-size: 16px;
+  }
+
+  .study-os .study-module .module-heading .module-subtitle {
+    display: inline;
+    font-size: 12px;
+  }
+
+  .study-os .overview-grid .stat-icon {
+    display: flex;
+    flex-shrink: 0;
+  }
+
+  .study-os .overview-grid .stat {
+    min-width: 0;
+    justify-content: flex-start;
+  }
+
+  .study-os .overview-grid .stat > div {
+    min-width: 0;
+  }
+
+  .study-os .overview-grid .stat > div > span {
+    white-space: normal;
+    overflow-wrap: anywhere;
+    font-size: 12px;
+  }
+
+  .study-os .course-table .course-table-head,
+  .study-os .course-table .course-row {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.35fr);
+    gap: 12px;
+  }
+
+  .study-os .course-table .course-table-head > span:last-child {
+    display: block;
+  }
+
+  .study-os .course-table .course-name {
+    min-width: 0;
+    white-space: normal;
+  }
+
+  .study-os .course-table .course-name strong {
+    overflow-wrap: anywhere;
+    font-size: 12px;
+  }
+
+  .study-os .course-table .progress-cell {
+    gap: 7px;
+  }
+
+  .study-os .course-table .progress-cell b {
+    flex-shrink: 0;
+    width: auto;
+  }
+
+  .study-os .course-table .segmented-progress {
+    min-width: 24px;
+  }
+
+  .study-os .course-table .course-task,
+  .study-os .course-table .course-task small,
+  .study-os .course-table .no-task,
+  .study-os .course-table .progress-cell b,
+  .study-os .course-table .course-table-head,
+  .study-os .schedule-list time,
+  .study-os .schedule-list time > span,
+  .study-os .schedule-list strong,
+  .study-os .schedule-list p,
+  .study-os .brief-card h3,
+  .study-os .brief-card > p,
+  .study-os .welcome-copy p,
+  .study-os .welcome-datetime,
+  .study-os .welcome-time-zone,
+  .study-os .workspace-meta,
+  .study-os .workspace-meta > span:last-child,
+  .study-os .system-state {
+    font-size: 12px;
+  }
+
+  .study-os .schedule-list li > div {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .study-os .schedule-list li > time,
+  .study-os .schedule-list .schedule-type,
+  .study-os .brief-card h3 > svg {
+    flex-shrink: 0;
+  }
+
+  .study-os .welcome-copy h1 {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .study-os .welcome-datetime {
+    flex-wrap: wrap;
+  }
+
+  .study-os .console-heading h2 > span {
+    display: inline;
+    font-size: 12px;
+  }
+
+  .study-os .console-heading h2 {
+    min-width: 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+}
+
+@media (max-width: 760px) {
+  .study-os .overview-grid {
+    gap: 8px;
+  }
+
+  .study-os .overview-grid .stat {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+    padding: 9px 7px;
+  }
+
+  .study-os .overview-grid .stat:not(:last-child)::after {
+    right: -5px;
+  }
+
+  .study-os .course-table .course-table-head,
+  .study-os .course-table .course-row {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 8px 12px;
+    padding-block: 12px;
+  }
+
+  .study-os .course-table .course-table-head > span:last-child,
+  .study-os .course-table .course-task {
+    grid-column: 1 / -1;
+  }
+
+  .study-os .course-table .course-row {
+    border-bottom: 1px solid var(--line);
+  }
+
+  .study-os .course-table .course-task::before {
+    content: '近期任务：';
+    font-size: 12px;
+    color: var(--ink);
+  }
+
+  .study-os .course-table .course-task .task-dot {
+    display: none;
+  }
+
+  .study-os .standalone-page .standalone-title {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .study-os .standalone-page .schedule-dates > button {
+    min-width: 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .study-os .standalone-page .schedule-list.detailed li {
+    flex-wrap: wrap;
+    gap: 6px 10px;
+    padding-block: 10px;
+  }
+
+  .study-os .standalone-page .schedule-list.detailed .schedule-type {
+    margin-left: 0;
+  }
+}
