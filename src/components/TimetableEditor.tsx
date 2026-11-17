@@ -43,17 +43,40 @@ export default function TimetableEditor({
   const [replace, setReplace] = useState(false)
   const [deleted, setDeleted] = useState<{ index: number; value: Period }>()
   const undoTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  // Each row keeps its first pre-edit schedule until a successful shift or structural change.
+  const editBaselines = useRef(new Map<number, Period[]>())
+  const undoButton = useRef<HTMLButtonElement>(null)
+  const generateButton = useRef<HTMLButtonElement>(null)
+  const pendingFocus = useRef<string | undefined>(undefined)
+  useEffect(() => {
+    const target = pendingFocus.current
+    if (!target) return
+    const element = target === 'undo' ? undoButton.current
+      : target === 'generate' ? generateButton.current : document.getElementById(target)
+    if (element) {
+      element.focus({ preventScroll: true })
+      pendingFocus.current = undefined
+    }
+  })
   useEffect(() => () => clearTimeout(undoTimer.current), [])
   function remove(index: number) {
     clearTimeout(undoTimer.current)
+    editBaselines.current.clear()
+    pendingFocus.current = 'undo'
     setDeleted({ index, value: { ...periods[index] } })
     onChange(periods.filter((_, i) => i !== index).map((period, i) => ({ ...period, period: i + 1 })))
-    undoTimer.current = setTimeout(() => setDeleted(undefined), 8000)
+    undoTimer.current = setTimeout(() => {
+      if (document.activeElement === undoButton.current) pendingFocus.current = 'add-period'
+      setDeleted(undefined)
+    }, 8000)
   }
   function undoDelete() {
     if (!deleted) return
     const restored = periods.map((period) => ({ ...period }))
-    restored.splice(Math.min(deleted.index, restored.length), 0, deleted.value)
+    const restoredIndex = Math.min(deleted.index, restored.length)
+    restored.splice(restoredIndex, 0, deleted.value)
+    pendingFocus.current = periodField(restoredIndex, 'start')
+    editBaselines.current.clear()
     onChange(restored.map((period, i) => ({ ...period, period: i + 1 })))
     clearTimeout(undoTimer.current)
     setDeleted(undefined)
@@ -67,46 +90,73 @@ export default function TimetableEditor({
       return
     }
     try {
-      onChange(generatePeriods(count, start, duration, gap))
+      const next = generatePeriods(count, start, duration, gap)
+      pendingFocus.current = periodField(0, 'start')
+      onChange(next)
+      editBaselines.current.clear()
+      clearTimeout(undoTimer.current)
+      undoTimer.current = undefined
+      setDeleted(undefined)
       setReplace(false)
     } catch (error) {
       setError((error as Error).message)
     }
   }
   function edit(index: number, field: 'start' | 'end', value: string) {
+    if (!editBaselines.current.has(index)) {
+      editBaselines.current.set(index, periods.map((period) => ({ ...period })))
+    }
     onChange(periods.map((period, i) => (i === index ? { ...period, [field]: value } : period)))
   }
   function shiftAfter(index: number) {
     setError('')
+    const baseline = editBaselines.current.get(index)
+    if (!baseline) return
     try {
       const next = periods.map((period) => ({ ...period }))
+      const anchorStart = toMinutes(next[index].start)
       let minute = toMinutes(next[index].end)
-      if (!Number.isFinite(minute)) throw new Error('请先填写有效的结束时间。')
+      if (!Number.isFinite(anchorStart) || !Number.isFinite(minute) || minute <= anchorStart)
+        throw new Error('请先填写有效的开始和结束时间，结束时间须晚于开始时间。')
       for (let i = index + 1; i < next.length; i++) {
-        const oldDuration = toMinutes(periods[i].end) - toMinutes(periods[i].start)
-        const oldGap = toMinutes(periods[i].start) - toMinutes(periods[i - 1].end)
-        const start = minute + Math.max(0, Number.isFinite(oldGap) ? oldGap : gap)
-        const end = start + (oldDuration > 0 ? oldDuration : duration)
-        if (end >= 1440) throw new Error('顺延后超出当天，请调整时间。')
+        const oldDuration = toMinutes(baseline[i].end) - toMinutes(baseline[i].start)
+        const oldGap = toMinutes(baseline[i].start) - toMinutes(baseline[i - 1].end)
+        if (!Number.isFinite(oldDuration) || oldDuration <= 0 || !Number.isFinite(oldGap) || oldGap < 0)
+          throw new Error('原作息时间无效，请先修正课时和课间后再顺延。')
+        const start = minute + oldGap
+        const end = start + oldDuration
+        if (start < 0 || !Number.isFinite(end) || end >= 1440)
+          throw new Error('顺延后超出当天，请调整时间。')
         next[i] = { ...next[i], start: toTime(start), end: toTime(end) }
         minute = end
       }
       onChange(next)
+      editBaselines.current.clear()
     } catch (error) {
       setError((error as Error).message)
     }
   }
   function add() {
     setError('')
+    // Validate only the generator fields used by this action, not the unrelated count.
+    const invalid = validateGeneratorFields(1, periods.length ? '00:00' : start, duration, periods.length ? gap : 0)
+      .filter((item) => item.field !== 'generator-count')
+    setGeneratorErrors(invalid)
+    if (invalid.length) {
+      focusField(invalid[0].field)
+      return
+    }
     const minute = periods.length ? toMinutes(periods.at(-1)!.end) + gap : toMinutes(start)
-    if (!Number.isFinite(minute) || minute + duration >= 1440) {
-      setError('无法继续添加，请先检查最后一节的结束时间。')
+    const end = minute + duration
+    if (!Number.isFinite(minute) || minute < 0 || !Number.isFinite(end) || end >= 1440) {
+      setError('无法继续添加，请检查开始时间、最后一节的结束时间及每节时长，确保不超出当天。')
       return
     }
     onChange([
       ...periods,
-      { period: periods.length + 1, start: toTime(minute), end: toTime(minute + duration) },
+      { period: periods.length + 1, start: toTime(minute), end: toTime(end) },
     ])
+    editBaselines.current.clear()
   }
   return (
     <div className="timetable-editor">
@@ -179,6 +229,7 @@ export default function TimetableEditor({
             {fieldMessage('generator-gap')}
           </label>
           <button
+            ref={generateButton}
             type="button"
             className="button button-secondary"
             onClick={() => (periods.length ? setReplace(true) : generate())}
@@ -193,7 +244,10 @@ export default function TimetableEditor({
             <button className="text-button" onClick={generate} disabled={disabled}>
               确认替换
             </button>
-            <button className="text-button" onClick={() => setReplace(false)} disabled={disabled}>
+            <button className="text-button" onClick={() => {
+              pendingFocus.current = 'generate'
+              setReplace(false)
+            }} disabled={disabled}>
               取消
             </button>
           </div>
@@ -203,7 +257,7 @@ export default function TimetableEditor({
       {deleted && (
         <div className="period-undo" role="status">
           <span>已删除第 {deleted.value.period} 节</span>
-          <button type="button" className="text-button" disabled={disabled || periods.length >= 30} onClick={undoDelete}>
+          <button ref={undoButton} type="button" className="text-button" disabled={disabled || periods.length >= 30} onClick={undoDelete}>
             撤销
           </button>
         </div>

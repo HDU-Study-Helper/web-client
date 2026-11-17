@@ -70,6 +70,8 @@ export function Modal({
   function beginClose(action?: () => void) {
     if (closing.current) return
     closing.current = true
+    // Keep the top-layer backdrop while preventing controls from firing during exit.
+    ref.current?.querySelectorAll<HTMLElement>('[data-modal-content]').forEach((content) => { content.inert = true })
     // Stop work immediately; keep the native modal mounted during its exit.
     dismissStartRef.current?.()
     const finish = () => {
@@ -159,7 +161,7 @@ export function Modal({
         if (event.target === event.currentTarget && event.animationName === 'modal-out') finishClose.current?.()
       }}
     >
-      <div className="modal-heading">
+      <div className="modal-heading" data-modal-content>
         <h2 id={titleId}>{title}</h2>
         <button
           type="button"
@@ -170,7 +172,7 @@ export function Modal({
           <X size={20} />
         </button>
       </div>
-      {children}
+      <div className="modal-content" data-modal-content>{children}</div>
     </dialog>
   )
 }

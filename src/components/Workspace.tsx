@@ -479,8 +479,14 @@ export default function Workspace({
 
   return (
     <div className={`study-os ${page === 'home' ? 'is-home' : ''}`}>
-      <a className="skip-link" href="#dashboard">
-        跳到工作台
+      <a className="skip-link" href="#workspace-content" onClick={(event) => {
+        event.preventDefault()
+        const content = document.getElementById('workspace-content')
+        if (content) content.dataset.skipFocus = event.detail === 0 ? 'true' : 'false'
+        content?.focus({ preventScroll: true })
+        document.getElementById('workspace-content')?.scrollIntoView({ block: 'start' })
+      }}>
+        跳到主要内容
       </a>
       <header className="os-header">
         <button
@@ -523,7 +529,7 @@ export default function Workspace({
       <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
         {pageAnnouncement}
       </p>
-      <main className={`workspace-main ${page === 'home' ? '' : 'single-view'}`}>
+      <main id="workspace-content" tabIndex={-1} onPointerDown={() => { delete document.getElementById('workspace-content')?.dataset.skipFocus }} onBlur={(event) => { if (event.target === event.currentTarget) delete event.currentTarget.dataset.skipFocus }} className={`workspace-main ${page === 'home' ? '' : 'single-view'}`}>
         <div className="dashboard-scroll" id="dashboard" tabIndex={-1} hidden={page !== 'home'}>
           <section className="welcome-panel">
             <PixelComputer />

@@ -99,11 +99,14 @@ export default function Wizard({
   const [connections, setConnections] = useState<Connection[]>([])
   const [dwsConnections, setDwsConnections] = useState<Connection[]>([])
   const [groups, setGroups] = useState<Group[]>()
+  const [groupWritePending, setGroupWritePending] = useState(false)
+  const [groupRevision, setGroupRevision] = useState(0)
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [fieldErrors, setFieldErrors] = useState<ValidationError[]>([])
+  const periodsValidated = useRef(false)
   const pendingFocus = useRef<string | undefined>(undefined)
   function focusField(field: string) {
     const target = document.getElementById(field)
@@ -111,6 +114,7 @@ export default function Wizard({
     target?.scrollIntoView({ block: 'center', behavior: 'instant' })
   }
   function showValidation(next: ValidationError[]) {
+    if (draft.step === 3 || next.some((item) => item.field.startsWith('period-'))) periodsValidated.current = true
     setFieldErrors(next)
     if (next.length) {
       pendingFocus.current = next[0].field
@@ -178,7 +182,7 @@ export default function Wizard({
   useEffect(() => {
     const controller = new AbortController()
     setGroups(undefined)
-    if (dws)
+    if (dws && !groupWritePending)
       void api<{ items: Group[] }>(`${dwsPath(dws.id)}/groups`, { signal: controller.signal })
         .then((data) => {
           if (!controller.signal.aborted) setGroups(data.items || [])
@@ -187,7 +191,7 @@ export default function Wizard({
           /* The group picker exposes errors and can retry without changing the allowlist. */
         })
     return () => controller.abort()
-  }, [dws?.id, success])
+  }, [dws?.id, success, groupWritePending, groupRevision])
   useEffect(() => {
     content.current?.focus({ preventScroll: true })
     window.scrollTo({ top: 0, behavior: 'instant' })
@@ -206,7 +210,7 @@ export default function Wizard({
     const next = { ...draft, ...patch }
     // Recheck only errors already exposed by submission, never untouched fields.
     const remaining = [...validateTermFields(next), ...validatePeriodFields(next.periods)]
-    setFieldErrors((current) => remaining.filter((item) => current.some((old) => old.field === item.field)))
+    setFieldErrors((current) => remaining.filter((item) => (periodsValidated.current && item.field.startsWith('period-')) || current.some((old) => old.field === item.field)))
     setDraft((current) => ({ ...current, ...patch, completed: false, importResult: undefined }))
     setError('')
     setSuccess('')
@@ -652,7 +656,7 @@ export default function Wizard({
                             </div>
                             {isDws && connection && (
                               <p className="group-caption">
-                                {groups === undefined
+                                {groupWritePending ? '采集范围核对中，请稍候…' : groups === undefined
                                   ? '请打开群设置，检查采集范围'
                                   : groups.length
                                     ? `已选择 ${groups.length} 个采集群`
@@ -990,7 +994,17 @@ export default function Wizard({
       {groupDialog && dws && (
         <GroupDialog
           connection={dws.id}
-          onClose={() => setGroupDialog(false)}
+          onClose={(pending) => {
+            setGroupDialog(false)
+            setGroupWritePending(pending)
+            setGroups(undefined)
+            if (!pending) setGroupRevision((value) => value + 1)
+          }}
+          onReconcile={() => {
+            if (!alive.current) return
+            setGroupWritePending(false)
+            setGroupRevision((value) => value + 1)
+          }}
           onSaved={() => {
             setGroupDialog(false)
             setSuccess('钉钉采集群已保存。')

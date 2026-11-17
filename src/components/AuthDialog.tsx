@@ -61,6 +61,7 @@ export default function AuthDialog({
     }
   }, [])
   useEffect(() => {
+    if (closing.current) return
     const controller = new AbortController()
     let timer: ReturnType<typeof setTimeout>
     let disposed = false
@@ -94,6 +95,7 @@ export default function AuthDialog({
       }, 1000)
     }
     async function run() {
+      if (disposed || closing.current) return
       try {
         if (canResume) {
           await poll(previous)

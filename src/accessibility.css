@@ -2,6 +2,25 @@
 [aria-invalid='true'] { border-color: var(--text-warning); }
 .field-error { color: var(--text-warning); font-size: 12px; line-height: 1.7; margin-top: 6px; }
 .modal-actions { flex-wrap: wrap; gap: 12px; }
+#workspace-content { scroll-margin-top: 80px; }
+#workspace-content:focus { outline: none; }
+#workspace-content[data-skip-focus='true']:focus { outline: 2px solid var(--blue); outline-offset: -3px; }
+/* Single-line controls share one outer size across login, setup and dialogs. */
+input:where(:not([type='checkbox']):not([type='radio'])), select {
+  box-sizing: border-box;
+  height: var(--control-height);
+  min-height: var(--control-height);
+  padding-inline: var(--control-padding);
+  font-family: var(--font-body);
+  font-size: var(--control-font-size);
+  line-height: 1.4;
+}
+.input-with-icon { box-sizing: border-box; height: var(--control-height); min-height: var(--control-height); padding-inline: var(--control-padding); }
+.input-with-icon input { height: calc(var(--control-height) - 2px); min-height: 0; padding: 0; }
+input::placeholder { font-size: inherit; }
+.number-unit input { padding-right: 36px; }
+.number-unit > span { bottom: 14px; font-size: 12px; }
+.timetable-editor .period-time-field input { height: var(--control-height); min-height: var(--control-height); padding-inline: 8px; font-size: var(--control-font-size); }
 @media (max-width: 760px), (pointer: coarse) {
   :is(.icon-button, .text-button, .quiet-link, .module-action, .chat-close-button, .send-button, .all-courses, .os-navigation > button, .add-period, .load-more) {
     min-width: 44px;

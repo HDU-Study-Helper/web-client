@@ -5,6 +5,9 @@
   font-display: swap;
 }
 :root {
+  --control-height: 48px;
+  --control-padding: 12px;
+  --control-font-size: 16px;
   --blue: #405b96;
   --blue-hover: #304879;
   --muted: #797e80;

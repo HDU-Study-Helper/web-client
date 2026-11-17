@@ -9,7 +9,7 @@ async function openAuth(page: Page, holdCreate = false, lifetime = 120000) {
   const createGate = new Promise<void>((resolve) => {
     releaseCreate = resolve
   })
-  const state = { status: 'pending', failPoll: false, polls: 0 }
+  const state = { status: 'pending', failPoll: false, polls: 0, creates: 0 }
   let expiresAt: string | undefined
   await page
     .context()
@@ -49,6 +49,7 @@ async function openAuth(page: Page, holdCreate = false, lifetime = 120000) {
       })
     if (path === '/platforms/connections' || path === '/dws/connections') return json({ items: [] })
     if (path === '/platforms/chaoxing/auth') {
+      state.creates++
       if (holdCreate) await createGate
       return json({ connection: { id: 'modal-fixture' }, auth: auth() }, 201)
     }
@@ -132,6 +133,20 @@ test('授权状态有独立 polite 名称，倒计时逐秒变化不改写播报
   await expect(status).toHaveText('已扫码，请在手机上确认')
 })
 
+test('退出动画期间Escape后立即Enter不会重新授权', async ({ page }) => {
+  await page.clock.install()
+  const { dialog, state } = await openAuth(page)
+  state.status = 'expired'
+  await page.clock.runFor(2100)
+  await expect(dialog.getByRole('button', { name: '重新获取', exact: true })).toBeFocused()
+  const before = { creates: state.creates, polls: state.polls }
+  await page.keyboard.press('Escape')
+  await page.keyboard.press('Enter')
+  await page.clock.runFor(300)
+  await expect(dialog).toHaveCount(0)
+  expect({ creates: state.creates, polls: state.polls }).toEqual(before)
+})
+
 for (const failure of ['expired', 'failed', 'network'] as const) {
   test(`${failure} 迁移聚焦重试，后续 clock 不再抢焦点`, async ({ page }) => {
     await page.clock.install()
@@ -175,6 +190,7 @@ for (const cancelSuccess of [false, true]) {
     page,
   }) => {
     await page.clock.install()
+    await page.clock.pauseAt(new Date())
     const { dialog, state } = await openAuth(page)
     await expect(dialog.getByRole('link')).toBeVisible()
     state.status = 'authorized'

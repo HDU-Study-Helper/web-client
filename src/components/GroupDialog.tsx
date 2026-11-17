@@ -8,10 +8,12 @@ export default function GroupDialog({
   connection,
   onClose,
   onSaved,
+  onReconcile,
 }: {
   connection: string
-  onClose: () => void
+  onClose: (savingPending: boolean) => void
   onSaved: () => void
+  onReconcile: () => void
 }) {
   const [groups, setGroups] = useState<Group[]>([])
   const [selected, setSelected] = useState<Map<string, Group>>(new Map())
@@ -25,7 +27,8 @@ export default function GroupDialog({
   const [version, setVersion] = useState(0)
   const alive = useRef(true)
   const modalRef = useRef<ModalHandle>(null)
-  const saveController = useRef<AbortController | undefined>(undefined)
+  const savePending = useRef(false)
+  const discoveryController = useRef<AbortController | undefined>(undefined)
   const searchRef = useRef<HTMLInputElement>(null)
   const descriptionId = useId()
   const limitId = useId()
@@ -74,52 +77,62 @@ export default function GroupDialog({
     void load()
     return () => {
       alive.current = false
-      saveController.current?.abort()
+      discoveryController.current?.abort()
       controller.abort()
     }
   }, [connection, version])
   async function more() {
+    if (!alive.current || savePending.current || loading) return
+    discoveryController.current?.abort()
+    const controller = new AbortController()
+    discoveryController.current = controller
+    const requestedCursor = cursor
     setLoading(true)
     setDiscoveryError('')
     try {
       const page = await api<{ items: Group[]; has_more: boolean; next_cursor?: string }>(
-        `${dwsPath(connection)}/available-groups?cursor=${encodeURIComponent(cursor!)}`,
+        `${dwsPath(connection)}/available-groups${requestedCursor ? `?cursor=${encodeURIComponent(requestedCursor)}` : ''}`,
+        { signal: controller.signal },
       )
-      if (!alive.current) return
-      if (page.has_more && (!page.next_cursor || page.next_cursor === cursor))
+      if (!alive.current || controller.signal.aborted) return
+      if (page.has_more && (!page.next_cursor || page.next_cursor === requestedCursor))
         throw new Error('群列表分页未推进，请稍后重试。')
       setGroups((current) => [
         ...new Map([...current, ...(page.items || [])].map((group) => [group.id, group])).values(),
       ])
       setCursor(page.has_more ? page.next_cursor : undefined)
     } catch (error) {
-      if (alive.current) setDiscoveryError(errorMessage(error))
+      if (alive.current && !controller.signal.aborted) setDiscoveryError(errorMessage(error))
     } finally {
-      if (alive.current) setLoading(false)
+      if (alive.current && !controller.signal.aborted) setLoading(false)
     }
   }
   async function save() {
+    if (!alive.current || savePending.current) return
+    savePending.current = true
     setSaving(true)
-    saveController.current = new AbortController()
     setError('')
     try {
       await api(`${dwsPath(connection)}/groups`, {
         method: 'PUT',
-        signal: saveController.current.signal,
+        // Dismissal must not pretend an in-flight server write was rolled back.
+        signal: AbortSignal.timeout(10000),
         body: { groups: [...selected.values()] },
       })
       if (alive.current) modalRef.current?.close(onSaved)
     } catch (error) {
       if (alive.current) setError(errorMessage(error))
     } finally {
+      savePending.current = false
       if (alive.current) setSaving(false)
+      else onReconcile()
     }
   }
   const visible = groups.filter((group) =>
     `${group.name} ${group.id}`.toLowerCase().includes(search.toLowerCase()),
   )
   return (
-    <Modal title="选择钉钉采集群" closeHandleRef={modalRef} onDismissStart={() => { alive.current = false; saveController.current?.abort() }} onClose={onClose} busy={saving} descriptionId={descriptionId} initialFocusRef={searchRef}>
+    <Modal title="选择钉钉采集群" closeHandleRef={modalRef} onDismissStart={() => { alive.current = false; discoveryController.current?.abort() }} onClose={() => onClose(savePending.current)} busy={saving} descriptionId={descriptionId} initialFocusRef={searchRef}>
       <p className="modal-description" id={descriptionId}>
         只读取你勾选的群。选好课程群和班级群，让重要消息汇入 HAA。
       </p>
@@ -202,7 +215,8 @@ export default function GroupDialog({
           未能完整加载可选群：{discoveryError} 已有选择会保留。
           <button
             className="text-button"
-            onClick={() => (cursor ? void more() : setVersion((value) => value + 1))}
+            disabled={saving || loading}
+            onClick={() => void more()}
           >
             重试加载
           </button>

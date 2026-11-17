@@ -77,6 +77,18 @@ test('重叠标记对应行开始，结束不晚于开始标记结束，修正�
   expect(saved.periods[1]).toEqual({ period: 2, start: '08:55', end: '09:40' })
 })
 
+test('删除前行后非法行重编号仍保留错误，撤销后错误跟随原行', async ({ page }) => {
+  await fixture(page, { ...draft, periods: [...draft.periods, { period: 3, start: '10:00', end: '' }] })
+  await page.getByRole('button', { name: '保存并完成设置' }).click()
+  await expectInlineError(page, 'period-3-end')
+  await page.getByRole('button', { name: '删除第 1 节', exact: true }).click()
+  await expectInlineError(page, 'period-2-end')
+  await page.getByRole('button', { name: '撤销', exact: true }).click()
+  await expectInlineError(page, 'period-3-end')
+  await page.locator('#period-3-end').fill('10:45')
+  await expect(page.locator('[aria-invalid="true"]')).toHaveCount(0)
+})
+
 test('空时间标记对应 input，生成器非法参数可定位并即时清除', async ({ page }) => {
   await fixture(page)
   await page.locator('#period-1-end').fill('')
