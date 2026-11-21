@@ -1,4 +1,22 @@
 /* Quiet academic content around the existing computer and assistant identity. */
+@media (min-width: 761px) {
+ .study-os.assistant-snapping .assistant-launcher,
+ .study-os.assistant-snapping .chat-window { transition: right 260ms cubic-bezier(.22,.8,.25,1), bottom 260ms cubic-bezier(.22,.8,.25,1); }
+}
+@media (prefers-reduced-motion: reduce) {
+ .study-os.assistant-snapping .assistant-launcher,
+ .study-os.assistant-snapping .chat-window { transition: none; }
+}
+/* Screenshot comparison mode; normal routes are unchanged. */
+.study-os.show-tlfull .schedule-page { max-width: none; }
+.study-os.show-tlfull .schedule-composition { display: block; }
+.study-os.show-tlfull .schedule-companion { display: none; }
+.study-os.show-tlfull .schedule-page .schedule-dates { display: flex; }
+.study-os.show-tlfull .schedule-page .schedule-dates > button { flex: 1 1 160px; }
+@media (min-width: 761px) {
+ .study-os.show-tlfull .schedule-page .schedule-list.detailed li { display: flex; }
+ .study-os.show-tlfull .schedule-page .schedule-type { margin-left: auto; }
+}
 .study-os {
   height: auto;
   min-height: 100dvh;
@@ -15,9 +33,74 @@
 .study-os .workspace-meta { padding: 16px var(--page-gutter); font-family: var(--font-body); letter-spacing: 0; }
 .study-os .workspace-main { flex: 1 0 auto; min-width: 0; padding: 0 var(--page-gutter) 32px; overflow: visible; }
 .study-os .dashboard-scroll { height: auto; overflow: visible; padding: 0; }
-.study-os .standalone-page { min-height: 0; padding: 8px 0 0; gap: 0; }
+.study-os .standalone-page { min-height: 0; padding: 8px 0 0; gap: 0; width: 100%; max-width: 1440px; margin-inline: auto; }
+.study-os .profile-page { max-width: 1240px; }
+.study-os .schedule-composition { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(260px, .85fr); gap: 20px; align-items: start; }
+.study-os .schedule-primary, .study-os .schedule-companion { min-width: 0; }
+.study-os .schedule-notifications { grid-column: 1 / -1; min-width: 0; }
+.study-os.show-tlfull .schedule-notifications { display: none; }
+.study-os .notification-preview { margin-bottom: 16px; }
+.study-os .mock-label { font-size: 11px; color: var(--text-secondary); border: 1px solid var(--line); padding: 3px 6px; white-space: nowrap; }
+.study-os .notification-disclaimer { font-size: 12px; color: var(--text-secondary); margin: 8px 0; line-height: 1.6; }
+.study-os .notification-filters { display: flex; gap: 8px; margin-bottom: 8px; }
+.study-os .notification-filters button { border: 1px solid var(--line); background: transparent; padding: 6px 12px; min-height: 32px; font-size: 12px; }
+.study-os .notification-filters button[aria-pressed='true'] { background: var(--light-blue); border-color: var(--blue); color: var(--blue); }
+.study-os .notification-items { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 28px; }
+.study-os .notification-item { display: flex; align-items: center; gap: 12px; min-width: 0; min-height: 76px; padding: 12px 0; border: 0; border-bottom: 1px solid var(--line); background: transparent; text-align: left; }
+.study-os .notification-item:hover { color: var(--blue); }
+.study-os .notification-kind { display: flex; flex-direction: column; align-items: center; gap: 5px; font-size: 11px; color: var(--text-secondary); flex: none; }
+.study-os .notification-copy { flex: 1; min-width: 0; }
+.study-os .notification-copy strong { display: block; font-size: 14px; line-height: 1.6; }
+.study-os .notification-copy small { display: block; font-size: 12px; color: var(--text-secondary); margin-top: 4px; }
+.study-os .notification-item time { font-size: 11px; color: var(--text-secondary); white-space: nowrap; }
+.study-os .notification-detail { font-size: 14px; line-height: 1.8; margin-top: 16px; }
+.study-os .profile-settings-column .notification-items { grid-template-columns: minmax(0, 1fr); }
+.study-os .profile-assistant-note { padding: 20px; border-top: 1px solid var(--line); margin-top: 20px; }
+.study-os .profile-assistant-note .pixel-computer { display: block; width: 96px; margin: 8px auto 24px; }
+.study-os .profile-assistant-note strong { font-size: 16px; }
+.study-os .profile-assistant-note p { color: var(--text-secondary); font-size: 13px; line-height: 1.7; margin-block: 8px; }
+@media (max-width: 760px) {
+ .study-os .notification-items { grid-template-columns: minmax(0, 1fr); }
+ .study-os .notification-filters button { min-height: 44px; }
+ .study-os .notification-item { gap: 8px; }
+ .study-os .profile-assistant-note { display: none; }
+}
+.study-os .schedule-primary > .study-module { margin-bottom: 12px; }
+.study-os .schedule-companion > .study-module { margin-bottom: 16px; }
+.study-os .companion-note { color: var(--text-secondary); font-size: 12px; line-height: 1.6; margin: 4px 0 8px; }
+.study-os .companion-task { display: flex; align-items: center; gap: 12px; width: 100%; padding: 12px 0; border: 0; border-bottom: 1px solid var(--line); background: transparent; text-align: left; }
+.study-os .companion-task:last-child { border-bottom: 0; }
+.study-os .companion-task:hover { color: var(--blue); }
+.study-os .companion-task time { font-family: var(--mono); font-size: 13px; flex: none; }
+.study-os .companion-task > span { flex: 1; min-width: 0; }
+.study-os .companion-task strong { display: block; font-size: 14px; line-height: 1.5; }
+.study-os .companion-task small { display: block; margin-top: 4px; color: var(--text-secondary); font-size: 12px; }
+.study-os .schedule-assistant-note { display: flex; align-items: flex-start; gap: 12px; padding: 4px 4px 12px; }
+.study-os .schedule-assistant-note .pixel-computer { width: 48px; flex: none; }
+.study-os .schedule-assistant-note strong { font-size: 14px; }
+.study-os .schedule-assistant-note p, .study-os .profile-context { font-size: 13px; line-height: 1.7; color: var(--text-secondary); margin: 8px 0; }
+.study-os .profile-composition { display: grid; grid-template-columns: minmax(240px, .85fr) minmax(0, 1.5fr); gap: 20px; align-items: start; }
+.study-os .profile-identity-column, .study-os .profile-settings-column { min-width: 0; }
+.study-os .profile-identity-column .profile-card { flex-wrap: wrap; }
+.study-os .profile-context { padding-inline: 4px; }
+.study-os .profile-settings-column > .study-module { margin-bottom: 12px; }
+.study-os .profile-settings-column > .button-secondary { margin-top: 0; }
+@media (max-width: 1000px) {
+ .study-os .schedule-composition, .study-os .profile-composition { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+ .study-os .schedule-page { max-width: 820px; }
+ .study-os .profile-page { max-width: 720px; }
+}
+/* Short-content pages must not inherit the dashboard's full-screen width. */
+.study-os .schedule-page .schedule-dates { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.study-os .schedule-page .schedule-dates > button { flex: none; justify-content: flex-start; }
+.study-os .schedule-page .schedule-list.detailed li { display: grid; grid-template-columns: 150px minmax(0, 1fr) auto; }
+.study-os .schedule-page .schedule-type { margin-left: 0; }
 .study-os .standalone-page > .study-module { flex: none; }
-.study-os .standalone-title { margin-bottom: var(--space-section); gap: 16px; flex-wrap: wrap; }
+.study-os .standalone-title { margin-bottom: 12px; gap: 12px; flex-wrap: wrap; }
+.study-os .standalone-title h1 { font-size: 26px; }
+.study-os .single-view .module-heading { min-height: 44px; }
+.study-os .standalone-page > .study-module { margin-bottom: 12px; }
+.study-os .schedule-empty { min-height: 168px; gap: 12px; padding: 20px 12px; }
 .study-os .standalone-title h1 { margin: 0; line-height: 1.4; }
 .study-os .welcome-panel {
   border: 0;
@@ -58,13 +141,18 @@
 .study-os .course-name strong { font-size: 14px; }
 .study-os .course-code { font-family: var(--font-body); font-size: 16px; font-weight: 600; }
 .study-os .profile-avatar { font-family: var(--font-body); }
-.study-os .schedule-dates { gap: 12px; margin-bottom: var(--space-section); }
-.study-os .schedule-dates > button { padding: 14px 16px; }
-.study-os .schedule-list.detailed { padding: 8px 0 16px; }
-.study-os .schedule-list.detailed li { min-height: 96px; gap: 24px; }
-.study-os .profile-card { padding: var(--space-section); gap: 16px; border-color: var(--line); box-shadow: none; margin-bottom: var(--space-section); }
-.study-os .preference-row { padding: 20px 0; gap: 20px; }
-.study-os .preference-row p { margin-top: 8px; font-size: 14px; line-height: 1.7; }
+.study-os .schedule-dates { gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+.study-os .schedule-dates > button { padding: 8px 12px; min-height: 40px; gap: 8px; }
+.study-os .schedule-list.detailed { padding: 4px 0 8px; }
+.study-os .schedule-list.detailed li { min-height: 64px; gap: 20px; }
+.study-os .schedule-list.detailed .timeline-dot { top: 28px; }
+.study-os .schedule-list.detailed li:not(:last-child)::after { top: 35px; bottom: -28px; }
+.study-os .schedule-list.detailed p { margin-top: 4px; }
+.study-os .profile-card { padding: 16px; gap: 12px; border-color: var(--line); box-shadow: none; margin-bottom: 12px; }
+.study-os .profile-avatar { width: 44px; height: 44px; font-size: 24px; }
+.study-os .profile-card h2 { font-size: 18px; margin-bottom: 4px; }
+.study-os .preference-row { padding: 12px 0; gap: 16px; }
+.study-os .preference-row p { margin-top: 4px; font-size: 14px; line-height: 1.6; }
 .study-os .standalone-action,
 .study-os .profile-page > .button-secondary { margin-top: 0; }
 .study-os h1:focus-visible { outline: 2px solid var(--blue); outline-offset: 6px; }
@@ -81,6 +169,13 @@
 .setup-content .generator-card { box-shadow: none; border-color: var(--line); }
 .setup-content .step-title { margin-bottom: 24px; }
 .login-form { gap: 16px; }
+.group-list { min-height: 0; }
+.group-list > .group-loading-more { min-height: 48px; padding-block: 12px; }
+.timetable-editor .empty-periods { min-height: 0; padding: 20px 12px; gap: 8px; }
+@media (min-width: 741px) {
+ .setup-content .timetable-editor { max-width: 640px; }
+ .timetable-editor .periods-table-header, .timetable-editor .period-row { grid-template-columns: 100px minmax(0, 1fr) minmax(0, 1fr) 96px; }
+}
 @media (max-width: 760px) {
   .setup-main { padding: 24px var(--page-gutter); }
   .setup-content .platform-card { padding: 16px 14px 0; }
@@ -96,12 +191,50 @@
   .study-os .stat strong { font-size: 28px; }
   .study-os .stat-icon > svg { width: 20px; }
   .study-os .schedule-list li { gap: 12px; }
-  .study-os .schedule-list.detailed li { gap: 16px; }
-  .study-os .profile-card { padding: 20px 16px; }
-  .study-os .standalone-title { margin-bottom: 20px; }
+  .study-os .schedule-page .schedule-list.detailed li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; padding-block: 10px; }
+  .study-os .schedule-list.detailed time { grid-column: 1 / -1; padding-left: 0; }
+  .study-os .schedule-list.detailed li > div { min-width: 0; }
+  .study-os .schedule-list.detailed .schedule-type { margin-left: 0; }
+  .study-os .schedule-list.detailed .timeline-dot { top: 18px; }
+  .study-os .schedule-list.detailed li:not(:last-child)::after { top: 25px; bottom: -18px; }
+  .study-os .profile-card { padding: 12px 16px; }
+  .study-os .standalone-title { margin-bottom: 12px; }
+  .study-os .standalone-title h1 { font-size: 24px; }
+  .study-os .schedule-dates > button { min-height: 44px; }
+  .study-os .standalone-page > .study-module { margin-bottom: 12px; }
+  .study-os .standalone-action,
+  .study-os .profile-page > .button-secondary { min-height: 44px; }
+}
+/* Desktop workspace: page chrome stays fixed; overflow belongs to content panels. */
+@media (min-width: 1101px) {
+ .study-os { height: 100dvh; min-height: 0; overflow: hidden; }
+ .study-os .os-header, .study-os .workspace-meta, .study-os .os-footer { flex-shrink: 0; }
+ .study-os .workspace-meta { padding-block: 8px; }
+ .study-os .workspace-main { flex: 1 1 0; min-height: 0; overflow: hidden; padding-bottom: 12px; }
+ .study-os .standalone-page { height: 100%; min-height: 0; overflow: hidden; }
+ .study-os .standalone-title { flex-shrink: 0; margin-bottom: 10px; }
+ .study-os .schedule-composition { flex: 1 1 0; min-height: 0; grid-template-rows: minmax(0, 1.2fr) minmax(0, .8fr); gap: 12px 20px; align-items: stretch; overflow: hidden; }
+ .study-os .schedule-primary { display: flex; flex-direction: column; min-height: 0; height: 100%; }
+ .study-os .schedule-primary .schedule-dates { flex-shrink: 0; margin-bottom: 8px; }
+ .study-os .schedule-primary > .study-module { flex: 1 1 0; min-height: 0; margin: 0; overflow-y: auto; }
+ .study-os .schedule-companion { min-height: 0; height: 100%; overflow-y: auto; }
+ .study-os .schedule-assistant-note { display: none; }
+ .study-os .schedule-notifications { min-height: 0; display: flex; }
+ .study-os .schedule-notifications > .notification-preview { width: 100%; height: 100%; min-height: 0; margin: 0; overflow-y: auto; }
+ .study-os .standalone-action { flex-shrink: 0; margin-top: 8px; min-height: 32px; padding-block: 6px; }
+ .study-os .profile-composition { flex: 1 1 0; min-height: 0; }
+ .study-os .profile-identity-column { min-height: 0; max-height: 100%; overflow-y: auto; }
+ .study-os .profile-settings-column { display: flex; flex-direction: column; min-height: 0; height: 100%; }
+ .study-os .profile-settings-column > .study-module:not(.notification-preview) { flex-shrink: 0; }
+ .study-os .profile-settings-column > .notification-preview { flex: 1 1 0; min-height: 0; overflow-y: auto; }
+ .study-os .profile-settings-column > .button-secondary { flex-shrink: 0; align-self: flex-start; }
+ .study-os .schedule-composition .study-module, .study-os .profile-composition .study-module { scrollbar-width: thin; overscroll-behavior-y: contain; }
+ .study-os .notification-preview .module-heading { position: sticky; top: 0; background: var(--surface-secondary); z-index: 1; }
+ .study-os.show-tlfull .schedule-composition { display: flex; flex-direction: column; }
+ .study-os.show-tlfull .schedule-primary { flex: 1 1 0; }
 }
 /* Desktop home fills the viewport; long modules own their scroll position. */
-@media (min-width: 1101px) and (min-height: 600px) {
+@media (min-width: 1101px) {
   .study-os.is-home { height: 100dvh; min-height: 0; overflow: hidden; }
   .study-os.is-home .workspace-main { flex: 1 1 0; min-height: 0; padding-bottom: 20px; }
   .study-os.is-home .dashboard-scroll {

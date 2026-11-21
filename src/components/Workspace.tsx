@@ -46,6 +46,7 @@ import {
   type MockCourse,
 } from '../data/mock'
 import PixelComputer from './PixelComputer'
+import NotificationPreview from './NotificationPreview'
 import { Brand, Modal, Notice, type ModalHandle } from './UI'
 
 type Page = 'home' | 'schedule' | 'profile'
@@ -123,7 +124,8 @@ export default function Workspace({
   onLogout: () => Promise<void>
   onSettings: () => void
 }) {
-  const [page, setPage] = useState<Page>('home')
+  const timelineFull = new URLSearchParams(window.location.search).get('show') === 'tlfull'
+  const [page, setPage] = useState<Page>(() => timelineFull ? 'schedule' : 'home')
   const [pageAnnouncement, setPageAnnouncement] = useState('')
   const pageHeadingRefs = useRef<Partial<Record<Page, HTMLHeadingElement | null>>>({})
   const previousPage = useRef<Page>('home')
@@ -138,7 +140,47 @@ export default function Workspace({
   const [chatClosing, setChatClosing] = useState(false)
   const [chatReady, setChatReady] = useState(false)
   const [chatMorph, setChatMorph] = useState<ChatMorph>()
-  const [chatAnchor, setChatAnchor] = useState<ChatAnchor>()
+  const [snapping, setSnapping] = useState(false)
+  const manualPanelPlacement = useRef(false)
+  const snapTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  function edgeAnchor(anchor: ChatAnchor, width: number, height: number): ChatAnchor {
+    const next = { x: Math.min(Math.max(width + 12, anchor.x), window.innerWidth - 12), y: Math.min(Math.max(height + 12, anchor.y), window.innerHeight - 12) }
+    if (window.matchMedia('(max-width: 760px)').matches) return next
+    const distances = [next.x - width - 12, window.innerWidth - 12 - next.x, next.y - height - 12, window.innerHeight - 12 - next.y]
+    const edge = distances.indexOf(Math.min(...distances))
+    if (edge === 0) next.x = width + 12
+    if (edge === 1) next.x = window.innerWidth - 12
+    if (edge === 2) next.y = height + 12
+    if (edge === 3) next.y = window.innerHeight - 12
+    return next
+  }
+  function snapToEdge() {
+    if (window.matchMedia('(max-width: 760px)').matches) return
+    const launcher = chatLauncherRef.current
+    if (!launcher) return
+    clearTimeout(snapTimer.current)
+    setSnapping(true)
+    setChatAnchor(current => current ? edgeAnchor(current, launcher.offsetWidth, launcher.offsetHeight) : current)
+    snapTimer.current = setTimeout(() => setSnapping(false), 280)
+  }
+  useEffect(() => () => clearTimeout(snapTimer.current), [])
+  const [positionKey] = useState(() => `haa:assistant-position:v1:${user.id}:${window.matchMedia('(max-width: 760px)').matches ? 'mobile' : 'desktop'}`)
+  const [chatAnchor, setChatAnchor] = useState<ChatAnchor | undefined>(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(positionKey) || 'null')
+      if (!saved || !Number.isFinite(saved.x) || !Number.isFinite(saved.y) || !Number.isFinite(saved.width) || !Number.isFinite(saved.height) || saved.width <= 0 || saved.height <= 0) return
+      return { x: saved.x * window.innerWidth / saved.width, y: saved.y * window.innerHeight / saved.height }
+    } catch { return undefined }
+  })
+  useEffect(() => {
+    if (!chatAnchor) return
+    const timer = window.setTimeout(() => {
+      try {
+        localStorage.setItem(positionKey, JSON.stringify({ ...chatAnchor, width: window.innerWidth, height: window.innerHeight }))
+      } catch { /* Storage may be disabled or full; dragging must remain usable. */ }
+    }, 150)
+    return () => window.clearTimeout(timer)
+  }, [chatAnchor, positionKey])
   const [chatPlacement, setChatPlacement] = useState<{ right: number; bottom: number }>()
   const [notice, setNotice] = useState('')
   const [reminders, setReminders] = useState(true)
@@ -225,14 +267,30 @@ export default function Workspace({
     })
     const place = () => {
       if (window.matchMedia('(max-width: 760px)').matches) return
+      if (manualPanelPlacement.current) {
+        if (dragState.current) return
+        setChatPlacement(current => current ? {
+          right: Math.max(12, Math.min(current.right, window.innerWidth - panel.offsetWidth - 12)),
+          bottom: Math.max(12, Math.min(current.bottom, window.innerHeight - panel.offsetHeight - 12)),
+        } : current)
+        return
+      }
       const origin = chatLauncherRef.current!.getBoundingClientRect()
       const width = panel.offsetWidth
       const height = Math.min(panel.offsetHeight, window.innerHeight - 24)
       // Keep the launcher in place. Prefer downward expansion when there is not enough room above.
-      const top = origin.bottom - height >= 12
-        ? origin.bottom - height
-        : Math.min(origin.top, window.innerHeight - height - 12)
-      const left = Math.max(12, Math.min(origin.right - width, window.innerWidth - width - 12))
+      const verticalCenter = (origin.top + origin.bottom) / 2 - height / 2
+      const onSide = origin.left <= 13 || origin.right >= window.innerWidth - 13
+      const top = onSide
+        ? Math.max(12, Math.min(verticalCenter, window.innerHeight - height - 12))
+        : origin.bottom - height >= 12 ? origin.bottom - height : Math.min(origin.top, window.innerHeight - height - 12)
+      const center = (origin.left + origin.right) / 2
+      // Expand to both sides first; use the side with room only near an edge.
+      const centered = center - width / 2
+      const preferredLeft = centered >= 12 && centered + width <= window.innerWidth - 12
+        ? centered
+        : origin.left + width <= window.innerWidth - 12 ? origin.left : origin.right - width
+      const left = Math.max(12, Math.min(preferredLeft, window.innerWidth - width - 12))
       const next = { right: window.innerWidth - left - width, bottom: window.innerHeight - Math.max(12, top) - height }
       setChatPlacement((current) => current?.right === next.right && current?.bottom === next.bottom ? current : next)
     }
@@ -311,13 +369,12 @@ export default function Workspace({
       const height = launcher?.offsetHeight || 58
       setChatAnchor((current) => {
         if (!current) return current
-        const next = {
-          x: Math.min(Math.max(width + 12, current.x), window.innerWidth - 12),
-          y: Math.min(Math.max(height + 12, current.y), window.innerHeight - 12),
-        }
+        if (launcherDragState.current || dragState.current) return current
+        const next = edgeAnchor(current, width, height)
         return next.x === current.x && next.y === current.y ? current : next
       })
     }
+    keepInViewport()
     window.addEventListener('resize', keepInViewport)
     return () => window.removeEventListener('resize', keepInViewport)
   }, [chatOpen, chatAnchor])
@@ -329,6 +386,7 @@ export default function Workspace({
     setPage(next)
   }
   function openChat() {
+    manualPanelPlacement.current = false
     setChatSession((value) => value + 1)
     clearTimeout(closeTimer.current)
     setChatClosing(false)
@@ -373,6 +431,8 @@ export default function Workspace({
     if (event.button !== 0 || chatOpen) return
     const launcher = chatLauncherRef.current
     if (!launcher) return
+    clearTimeout(snapTimer.current)
+    setSnapping(false)
     const rect = launcher.getBoundingClientRect()
     launcherDragState.current = {
       pointerId: event.pointerId,
@@ -406,6 +466,7 @@ export default function Workspace({
     suppressLauncherClick.current = drag.moved
     if (drag.moved) setTimeout(() => (suppressLauncherClick.current = false), 0)
     launcherDragState.current = undefined
+    if (drag.moved) snapToEdge()
     if (event.currentTarget.hasPointerCapture(event.pointerId))
       event.currentTarget.releasePointerCapture(event.pointerId)
   }
@@ -420,13 +481,15 @@ export default function Workspace({
     if (event.button !== 0 || window.matchMedia('(max-width: 760px)').matches) return
     const panel = chatWindowRef.current
     if (!panel) return
+    clearTimeout(snapTimer.current)
+    setSnapping(false)
     const rect = panel.getBoundingClientRect()
     dragState.current = {
       pointerId: event.pointerId,
       offsetX: event.clientX - rect.left,
       offsetY: event.clientY - rect.top,
     }
-    setChatAnchor({ x: rect.right, y: rect.bottom })
+    manualPanelPlacement.current = true
     event.currentTarget.setPointerCapture(event.pointerId)
   }
   function moveChat(event: ReactPointerEvent<HTMLElement>) {
@@ -437,11 +500,41 @@ export default function Workspace({
     const maxY = Math.max(12, window.innerHeight - panel.offsetHeight - 12)
     const x = Math.min(Math.max(12, event.clientX - drag.offsetX), maxX)
     const y = Math.min(Math.max(12, event.clientY - drag.offsetY), maxY)
-    setChatAnchor({ x: x + panel.offsetWidth, y: y + panel.offsetHeight })
+    setChatPlacement({ right: window.innerWidth - x - panel.offsetWidth, bottom: window.innerHeight - y - panel.offsetHeight })
   }
   function endChatDrag(event: ReactPointerEvent<HTMLElement>) {
     if (dragState.current?.pointerId !== event.pointerId) return
     dragState.current = undefined
+    const panel = chatWindowRef.current
+    const launcher = chatLauncherRef.current
+    if (panel && launcher) {
+      const rect = panel.getBoundingClientRect()
+      const target = edgeAnchor({ x: rect.right, y: rect.bottom }, panel.offsetWidth, panel.offsetHeight)
+      clearTimeout(snapTimer.current)
+      setSnapping(true)
+      setChatPlacement({ right: window.innerWidth - target.x, bottom: window.innerHeight - target.y })
+      // Both shapes share the same docking edge and center along that edge.
+      // Re-running nearest-edge selection with launcher dimensions can choose a different edge.
+      const panelLeft = target.x - panel.offsetWidth
+      const panelTop = target.y - panel.offsetHeight
+      const distances = [panelLeft - 12, window.innerWidth - 12 - target.x, panelTop - 12, window.innerHeight - 12 - target.y]
+      const edge = distances.indexOf(Math.min(...distances))
+      const ballWidth = launcher.offsetWidth
+      const ballHeight = launcher.offsetHeight
+      const anchor = {
+        x: panelLeft + panel.offsetWidth / 2 + ballWidth / 2,
+        y: panelTop + panel.offsetHeight / 2 + ballHeight / 2,
+      }
+      if (edge === 0) anchor.x = ballWidth + 12
+      if (edge === 1) anchor.x = window.innerWidth - 12
+      if (edge === 2) anchor.y = ballHeight + 12
+      if (edge === 3) anchor.y = window.innerHeight - 12
+      setChatAnchor({
+        x: Math.min(Math.max(ballWidth + 12, anchor.x), window.innerWidth - 12),
+        y: Math.min(Math.max(ballHeight + 12, anchor.y), window.innerHeight - 12),
+      })
+      snapTimer.current = setTimeout(() => setSnapping(false), 280)
+    }
     if (event.currentTarget.hasPointerCapture(event.pointerId))
       event.currentTarget.releasePointerCapture(event.pointerId)
   }
@@ -478,7 +571,7 @@ export default function Workspace({
   }
 
   return (
-    <div className={`study-os ${page === 'home' ? 'is-home' : ''}`}>
+    <div className={`study-os ${page === 'home' ? 'is-home' : ''} ${timelineFull ? 'show-tlfull' : ''} ${snapping ? 'assistant-snapping' : ''}`}>
       <a className="skip-link" href="#workspace-content" onClick={(event) => {
         event.preventDefault()
         const content = document.getElementById('workspace-content')
@@ -891,7 +984,7 @@ export default function Workspace({
         )}
 
         {page === 'schedule' && (
-          <section className="standalone-page">
+          <section className="standalone-page schedule-page">
             <header className="standalone-title">
               <h1
                 ref={(heading) => { pageHeadingRefs.current.schedule = heading }}
@@ -900,6 +993,8 @@ export default function Workspace({
               >日程</h1>
               <span className="local-page-badge">示例快照 · {academicSnapshot.date}</span>
             </header>
+            <div className="schedule-composition">
+            <div className="schedule-primary">
             <div className="schedule-dates">
               {scheduleDays.map((day, i) => (
                 <button
@@ -924,6 +1019,25 @@ export default function Workspace({
                 </div>
               )}
             </Module>
+            </div>
+            <aside className="schedule-companion" aria-label="日程相关任务">
+              <Module title="近期截止">
+                <p className="companion-note">按 {academicSnapshot.date} 示例快照排序</p>
+                {courses.filter((item) => item.due).sort((a, b) => a.due.localeCompare(b.due)).map((item) => (
+                  <button className="companion-task" key={item.id} onClick={() => setCourse(item)}>
+                    <time dateTime={item.due}>{item.due.slice(5).replace('-', '/')}</time>
+                    <span><strong>{item.task}</strong><small>{item.name}</small></span>
+                    <ArrowUpRight size={15} aria-hidden="true" />
+                  </button>
+                ))}
+              </Module>
+              <div className="schedule-assistant-note">
+                <PixelComputer happy />
+                <div><strong>课后怎么安排？</strong><p>让助手结合课程任务，帮你梳理学习顺序。</p><button className="text-button" onClick={openChat}>和助手聊聊 <ArrowUpRight size={14} /></button></div>
+              </div>
+            </aside>
+            <div className="schedule-notifications"><NotificationPreview /></div>
+            </div>
             <button
               className="button button-secondary standalone-action"
               onClick={() => navigate('home')}
@@ -943,6 +1057,8 @@ export default function Workspace({
               >我的</h1>
               <span className="local-page-badge">示例快照 · {academicSnapshot.date}</span>
             </header>
+            <div className="profile-composition">
+            <div className="profile-identity-column">
             <div className="profile-card">
               <span className="profile-avatar">{name.slice(0, 1).toUpperCase()}</span>
               <div>
@@ -957,6 +1073,10 @@ export default function Workspace({
                 学习者
               </span>
             </div>
+            <p className="profile-context">学期与作息保存在当前浏览器。平台连接请在设置中核对。</p>
+            <div className="profile-assistant-note"><PixelComputer happy /><strong>学期有变化？</strong><p>调整课程与作息后，回到设置核对学期信息。</p><button className="text-button" onClick={onSettings}>查看学期设置 <ArrowUpRight size={14} /></button></div>
+            </div>
+            <div className="profile-settings-column">
             <Module title="偏好与设置">
               <div className="preference-row">
                 <div>
@@ -989,6 +1109,7 @@ export default function Workspace({
                 </button>
               </div>
             </Module>
+            <NotificationPreview />
             {notice && <Notice tone="error">{notice}</Notice>}
             <button
               className="button button-secondary"
@@ -1000,6 +1121,8 @@ export default function Workspace({
               <LogOut size={15} />
               {preview ? '退出本地预览' : '退出登录'}
             </button>
+            </div>
+            </div>
           </section>
         )}
       </main>

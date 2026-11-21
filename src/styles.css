@@ -1851,7 +1851,7 @@ strong {
     padding-right: 23px;
   }
 }
-@media (max-width: 900px) {
+@media (max-width: 940px) {
   .login-page {
     grid-template-columns: minmax(340px, 0.9fr) minmax(400px, 1fr);
   }

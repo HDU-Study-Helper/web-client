@@ -93,8 +93,9 @@ for (const width of [320, 390, 760]) {
       })
       const content = page.locator(navigation === '主页' ? '#dashboard' : '.standalone-page')
       const box = (await content.boundingBox())!
-      expect(box.x).toBeCloseTo(bounds.x, 0)
-      expect(box.width).toBeCloseTo(bounds.width, 0)
+      const expectedWidth = Math.min(bounds.width, navigation === '我的' ? 720 : navigation === '日程' ? 820 : Infinity)
+      expect(box.x).toBeCloseTo(bounds.x + (bounds.width - expectedWidth) / 2, 0)
+      expect(box.width).toBeCloseTo(Math.min(bounds.width, navigation === '我的' ? 720 : navigation === '日程' ? 820 : Infinity), 0)
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
         true,
       )

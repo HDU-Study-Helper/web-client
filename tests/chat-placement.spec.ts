@@ -10,6 +10,7 @@ for (const position of [{ x: 1160, y: 45 }, { x: 45, y: 60 }, { x: 1160, y: 720 
     await page.mouse.down()
     await page.mouse.move(position.x, position.y, { steps: 12 })
     await page.mouse.up()
+    await expect(page.locator('.study-os')).not.toHaveClass(/assistant-snapping/)
     const origin = (await launcher.boundingBox())!
     await launcher.click()
     const panel = page.getByRole('region', { name: 'Academic Assistant 对话区域' })
@@ -19,7 +20,11 @@ for (const position of [{ x: 1160, y: 45 }, { x: 45, y: 60 }, { x: 1160, y: 720 
     expect(box.y).toBeGreaterThanOrEqual(11)
     expect(box.x + box.width).toBeLessThanOrEqual(1269)
     expect(box.y + box.height).toBeLessThanOrEqual(789)
-    if (position.y < 100) expect(box.y).toBeCloseTo(origin.y, 0)
+    if (position.y < 100) {
+      const side = origin.x <= 13 || origin.x + origin.width >= 1267
+      const expected = side ? Math.max(12, Math.min(origin.y + origin.height / 2 - box.height / 2, 788 - box.height)) : origin.y
+      expect(box.y).toBeCloseTo(expected, 0)
+    }
     const close = page.getByRole('button', { name: '关闭学习助手' })
     const closeBox = (await close.boundingBox())!
     expect(box.x + box.width - closeBox.x - closeBox.width).toBeLessThanOrEqual(18)

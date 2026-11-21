@@ -1,0 +1,15 @@
+import { test, expect } from '@playwright/test'
+test('show=tlfull只切换截图时间线布局，默认预览不变', async ({ page }) => {
+ await page.setViewportSize({width:1440,height:900})
+ await page.goto('/?demo=1&show=tlfull')
+ await expect(page.getByRole('heading',{name:'日程',exact:true})).toBeVisible()
+ await expect(page.locator('.schedule-companion')).toBeHidden()
+ const content=await page.locator('.workspace-main').evaluate(e=>{const r=e.getBoundingClientRect(),s=getComputedStyle(e);return r.width-parseFloat(s.paddingLeft)-parseFloat(s.paddingRight)})
+ expect((await page.locator('.schedule-page').boundingBox())!.width).toBeCloseTo(content,0)
+ await expect(page.locator('.schedule-list.detailed li').first()).toHaveCSS('display','flex')
+ await page.goto('/?demo=1')
+ await expect(page.locator('.welcome-panel')).toBeVisible()
+ await page.getByRole('button',{name:'日程',exact:true}).click()
+ await expect(page.locator('.schedule-companion')).toBeVisible()
+ expect((await page.locator('.schedule-page').boundingBox())!.width).toBeLessThanOrEqual(1440)
+})

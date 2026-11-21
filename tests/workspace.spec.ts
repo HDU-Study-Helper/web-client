@@ -73,9 +73,10 @@ test('本地预览不请求 API，悬浮助手可打开、拖动并保留消息'
   await page.mouse.move(launcherBeforeDrag.x - 180, launcherBeforeDrag.y - 110, { steps: 6 })
   await page.mouse.up()
   await expect(page.getByRole('region', { name: 'Academic Assistant 对话区域' })).toHaveCount(0)
+  await expect(page.locator('.study-os')).not.toHaveClass(/assistant-snapping/)
   const launcherAfterDrag = (await launcher.boundingBox())!
   expect(launcherAfterDrag.x).toBeLessThan(launcherBeforeDrag.x)
-  expect(launcherAfterDrag.y).toBeLessThan(launcherBeforeDrag.y)
+  expect(Math.min(launcherAfterDrag.x - 12, 1428 - launcherAfterDrag.x - launcherAfterDrag.width, launcherAfterDrag.y - 12, 888 - launcherAfterDrag.y - launcherAfterDrag.height)).toBeCloseTo(0, 0)
 
   await launcher.click()
   const assistant = page.getByRole('region', { name: 'Academic Assistant 对话区域' })
@@ -87,8 +88,11 @@ test('本地预览不请求 API，悬浮助手可打开、拖动并保留消息'
   await expect(assistant).toBeVisible()
   await expect(input).toBeFocused()
   const panelBox = (await assistant.boundingBox())!
-  expect(panelBox.x + panelBox.width).toBeCloseTo(launcherBox.x + launcherBox.width, 0)
-  expect(panelBox.y + panelBox.height).toBeCloseTo(launcherBox.y + launcherBox.height, 0)
+  const centeredX = launcherBox.x + launcherBox.width / 2 - panelBox.width / 2
+  const preferredX = centeredX >= 12 && centeredX + panelBox.width <= 1428 ? centeredX : launcherBox.x + panelBox.width <= 1428 ? launcherBox.x : launcherBox.x + launcherBox.width - panelBox.width
+  expect(panelBox.x).toBeCloseTo(Math.max(12, Math.min(preferredX, 1428 - panelBox.width)), 0)
+  expect(panelBox.y).toBeGreaterThanOrEqual(12)
+  expect(panelBox.y + panelBox.height).toBeLessThanOrEqual(888)
   await expect(morph).toHaveCount(0)
 
   const before = (await assistant.boundingBox())!
@@ -97,12 +101,15 @@ test('本地预览不请求 API，悬浮助手可打开、拖动并保留消息'
   await page.mouse.down()
   await page.mouse.move(before.x - 140, before.y - 80, { steps: 6 })
   await page.mouse.up()
+  await expect(page.locator('.study-os')).not.toHaveClass(/assistant-snapping/)
   const after = (await assistant.boundingBox())!
   expect(after.x).toBeLessThan(before.x)
-  expect(after.y).toBeLessThan(before.y)
+  expect(after.y).toBeLessThanOrEqual(before.y)
+  expect(Math.min(after.x - 12, 1428 - after.x - after.width, after.y - 12, 888 - after.y - after.height)).toBeCloseTo(0, 0)
   expect(after.x).toBeGreaterThanOrEqual(0)
   expect(after.y).toBeGreaterThanOrEqual(0)
-  const movedAnchor = { x: after.x + after.width, y: after.y + after.height }
+  const dockedLauncher = (await launcher.boundingBox())!
+  const movedAnchor = { x: dockedLauncher.x + dockedLauncher.width, y: dockedLauncher.y + dockedLauncher.height }
 
   await page.getByRole('button', { name: '这周有哪些作业要交？' }).click()
   await expect(page.getByRole('log')).toContainText('我这周有哪些作业和截止日期？')
@@ -143,14 +150,14 @@ test('本地预览不请求 API，悬浮助手可打开、拖动并保留消息'
   await expect(page.getByRole('heading', { name: '日程', exact: true })).toBeVisible()
   const scheduleBounds = (await page.locator('.standalone-page').boundingBox())!
   expect(scheduleBounds.x).toBeCloseTo(contentX, 0)
-  expect(scheduleBounds.width).toBeCloseTo(contentWidth, 0)
+  expect(scheduleBounds.width).toBeCloseTo(Math.min(contentWidth, 1440), 0)
   await page.getByRole('button', { name: '11.13 / 周五' }).click()
   await expect(page.getByRole('heading', { name: '这一天，还留有空白。' })).toBeVisible()
   await page.getByRole('button', { name: '我的', exact: true }).click()
   await expect(page.getByRole('heading', { name: '我的', exact: true })).toBeVisible()
   const profileBounds = (await page.locator('.standalone-page').boundingBox())!
-  expect(profileBounds.x).toBeCloseTo(contentX, 0)
-  expect(profileBounds.width).toBeCloseTo(contentWidth, 0)
+  expect(profileBounds.x).toBeCloseTo(contentX + (contentWidth - Math.min(contentWidth, 1240)) / 2, 0)
+  expect(profileBounds.width).toBeCloseTo(Math.min(contentWidth, 1240), 0)
   await page.getByRole('button', { name: '打开学习助手' }).click()
   await expect(page.getByRole('log')).toContainText('你有 3 项待完成任务')
   await input.fill('我最近的学习进度怎么样？')

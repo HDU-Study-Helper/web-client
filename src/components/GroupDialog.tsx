@@ -179,7 +179,7 @@ export default function GroupDialog({
           </label>
         ))}
         {loading && (
-          <div className="empty-state">
+          <div className={`empty-state ${groups.length ? 'group-loading-more' : ''}`}>
             <Spinner />
             正在读取群列表…
           </div>
