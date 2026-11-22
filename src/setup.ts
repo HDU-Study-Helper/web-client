@@ -15,6 +15,21 @@ export function newDraft(): SetupDraft {
   }
 }
 const key = (userID: string) => `haa:setup:v1:${userID}`
+
+function preference(userID: string, name: string, value?: string): string | undefined {
+  const storageKey = `haa:${name}:v1:${userID}`
+  try {
+    if (value !== undefined) localStorage.setItem(storageKey, value)
+    return localStorage.getItem(storageKey) || undefined
+  } catch {
+    return undefined
+  }
+}
+
+export const preferWorkspace = (userID: string) => preference(userID, 'workspace') === 'open'
+export const rememberWorkspace = (userID: string) => preference(userID, 'workspace', 'open')
+export const schoolConnectionPreference = (userID: string, id?: string) =>
+  preference(userID, 'jwxt-connection', id)
 export function loadDraft(userID: string): SetupDraft {
   const fallback = newDraft()
   try {

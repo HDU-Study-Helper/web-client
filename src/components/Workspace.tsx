@@ -1,4 +1,5 @@
 import {
+  useCallback,
   useEffect,
   useId,
   useLayoutEffect,
@@ -47,10 +48,16 @@ import {
 } from '../data/mock'
 import PixelComputer from './PixelComputer'
 import NotificationPreview from './NotificationPreview'
+import LiveNotifications from './LiveNotifications'
+import { LiveOfferingDetail, ScheduleDetail, TodoDetail } from './LiveDetails'
+import { LiveCourses, LiveTimeLine, LiveToday, LiveTodos } from './LiveWorkspacePanels'
+import { dateKey, schedulesOn, useWorkspaceData, type Offering, type PublicTodo, type ScheduleEntry } from '../useWorkspaceData'
+import { useLiveChat } from '../useLiveChat'
+import { loadDraft } from '../setup'
 import { Brand, Modal, Notice, type ModalHandle } from './UI'
 
 type Page = 'home' | 'schedule' | 'profile'
-type Message = { id: number; role: 'user' | 'assistant'; text: string; sources?: string[] }
+type Message = { id: number | string; role: 'user' | 'assistant'; text: string; sources?: string[] }
 type ChatAnchor = { x: number; y: number }
 type ChatMorph = {
   launcherWidth: number
@@ -61,6 +68,10 @@ type ChatMorph = {
 type DragState = { pointerId: number; offsetX: number; offsetY: number }
 type LauncherDragState = DragState & { startX: number; startY: number; moved: boolean }
 const questionIcons = { calendar: CalendarDays, book: BookOpen, trend: TrendingUp, target: Target }
+const liveQuestions = [
+  { id: 'todos', icon: 'calendar', text: '有哪些未完成待办？', prompt: '请查看我的公开待办，只列出已记录的未完成事项。' },
+  { id: 'explain', icon: 'book', text: '解释一个概念', prompt: '请用日常生活中的例子解释定积分，不要改动我的数据。' },
+]
 const navigation = [
   { id: 'home', label: '主页', icon: House },
   { id: 'schedule', label: '日程', icon: CalendarDays },
@@ -133,10 +144,24 @@ export default function Workspace({
   const [clock, setClock] = useState(() => new Date())
   const [expanded, setExpanded] = useState(false)
   const [course, setCourse] = useState<MockCourse>()
-  const [messages, setMessages] = useState<Message[]>([])
+  const [demoMessages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
-  const [replying, setReplying] = useState(false)
+  const [demoReplying, setReplying] = useState(false)
   const [chatOpen, setChatOpen] = useState(false)
+  const [revision, setRevision] = useState(0)
+  const [offering, setOffering] = useState<Offering>()
+  const [selectedTodo, setSelectedTodo] = useState<PublicTodo>()
+  const [selectedSchedule, setSelectedSchedule] = useState<ScheduleEntry>()
+  const [choiceText, setChoiceText] = useState<Record<string, string>>({})
+  const refreshWorkspace = useCallback(() => setRevision(n => n + 1), [])
+  const today = dateKey(clock)
+  const live = useWorkspaceData(!preview, today, revision)
+  const chat = useLiveChat(user.id, !preview, chatOpen, refreshWorkspace)
+  const messages: Message[] = preview ? demoMessages : chat.messages
+  const replying = preview ? demoReplying : chat.busy
+  const draft = loadDraft(user.id)
+  const term = preview ? academicSnapshot.semester : draft.monday ? `${draft.academicYear} 学年 · 第 ${draft.term} 学期` : '学期未在本机设置'
+  const metric = (value: number | undefined) => value === undefined ? '—' : String(value).padStart(2, '0')
   const [chatClosing, setChatClosing] = useState(false)
   const [chatReady, setChatReady] = useState(false)
   const [chatMorph, setChatMorph] = useState<ChatMorph>()
@@ -540,6 +565,10 @@ export default function Workspace({
   }
   function send(text: string) {
     const value = text.trim()
+    if (!preview) {
+      if (chat.send(value)) setInput('')
+      return
+    }
     if (!value || pendingReply.current) return
     pendingReply.current = true
     setMessages((current) => [...current, { id: nextId.current++, role: 'user', text: value }])
@@ -557,6 +586,13 @@ export default function Workspace({
     send(input)
   }
   function clearChat() {
+    if (!preview) {
+      setConfirmClear(false)
+      void chat.newThread().then(created => {
+        if (created) {setInput('');setChoiceText({})}
+      })
+      return
+    }
     clearTimeout(replyTimer.current)
     pendingReply.current = false
     setReplying(false)
@@ -566,7 +602,7 @@ export default function Workspace({
     setConfirmClear(false)
   }
   function requestNewChat() {
-    if (messages.length || pendingReply.current) setConfirmClear(true)
+    if (!preview || messages.length || pendingReply.current) setConfirmClear(true)
     else inputRef.current?.focus()
   }
 
@@ -612,11 +648,10 @@ export default function Workspace({
 
       <div className="workspace-meta">
         <strong>
-          本地示例快照 · <time dateTime={academicSnapshot.date}>{academicSnapshot.date}</time>
+          {preview ? <>本地示例快照 · <time dateTime={academicSnapshot.date}>{academicSnapshot.date}</time></> : '当前账号 · 学业工作台'}
         </strong>
         <span>
-          {academicSnapshot.semester} <span className="meta-divider">/</span>{' '}
-          {academicSnapshot.week}
+          {term}{preview && <> <span className="meta-divider">/</span> {academicSnapshot.week}</>}
         </span>
       </div>
       <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
@@ -642,7 +677,7 @@ export default function Workspace({
                 <time dateTime={clock.toISOString()}>{time}</time>
                 <span className="welcome-time-zone">北京时间</span>
               </div>
-              <p>示例学业概览 · {academicSnapshot.date} 快照，与当前时钟分开</p>
+              <p>{preview ? `示例学业概览 · ${academicSnapshot.date} 快照，与当前时钟分开` : '数据来自当前账号已保存的日程、学业归档和公开待办。'}</p>
             </div>
             <svg className="mountain-art" viewBox="0 0 300 130" aria-hidden="true">
               <defs>
@@ -666,24 +701,24 @@ export default function Workspace({
               {[
                 {
                   icon: ClipboardCheck,
-                  value: academicSnapshot.pendingTasks,
-                  label: '示例待完成任务',
+                  value: preview ? academicSnapshot.pendingTasks : live.todos.data?.filter(t => t.status === 'open').length,
+                  label: preview ? '示例待完成任务' : '未完成待办',
                   color: 'blue',
                 },
                 {
                   icon: CalendarDays,
-                  value: academicSnapshot.scheduledClasses,
-                  label: '示例日课程',
+                  value: preview ? academicSnapshot.scheduledClasses : live.schedules.data && schedulesOn(live.schedules.data, today).filter(t => t.source === 'TIMETABLE').length,
+                  label: preview ? '示例日课程' : '今日课程',
                   color: 'sand',
                 },
-                { icon: Layers3, value: courses.length, label: '示例进行中课程', color: 'green' },
+                { icon: Layers3, value: preview ? courses.length : live.offerings.data?.length, label: preview ? '示例进行中课程' : '平台开课实例', color: 'green' },
               ].map(({ icon: Icon, value, label, color }) => (
                 <div className={`stat stat-${color}`} key={label}>
                   <span className="stat-icon">
                     <Icon size={29} strokeWidth={1.5} />
                   </span>
                   <div>
-                    <strong>{String(value).padStart(2, '0')}</strong>
+                    <strong>{metric(value)}</strong>
                     <span>{label}</span>
                   </div>
                 </div>
@@ -693,7 +728,7 @@ export default function Workspace({
 
           <div className="dashboard-middle">
             <Module
-              title="示例安排"
+              title={preview ? "示例安排" : "今日安排"}
               className="today-module"
               action={
                 <button
@@ -705,16 +740,16 @@ export default function Workspace({
                 </button>
               }
             >
-              <ScheduleList />
+              {preview ? <><ScheduleList />
               <footer className="module-footnote">
                 <Clock3 size={12} /> 示例日程 · {academicSnapshot.dateLabel}
-              </footer>
+              </footer></> : <LiveToday schedules={live.schedules} today={today} onSelect={setSelectedSchedule} />}
             </Module>
             <Module
-              title="示例学业简报"
+              title={preview ? "示例学业简报" : "公开待办"}
               className="brief-module"
             >
-              <div className="brief-card">
+              {preview ? <><div className="brief-card">
                 <h3>
                   <CircleAlert size={17} />
                   {reminders ? brief.title : '学业提醒已暂停'}
@@ -728,15 +763,15 @@ export default function Workspace({
               <button className="brief-link" onClick={() => setCourse(courses[1])}>
                 查看待办详情 <ArrowRight size={15} />
               </button>
-              {reminders && <p className="brief-hint">{brief.suggestion}</p>}
+              {reminders && <p className="brief-hint">{brief.suggestion}</p>}</> : <LiveTodos resource={live.todos} onSelect={setSelectedTodo} brief reminders={reminders} />}
             </Module>
           </div>
 
           <Module
-            title="示例课程"
+            title={preview ? "示例课程" : "平台课程归档"}
             className="courses-module"
           >
-            <div className="course-table" role="group" aria-label="课程学习进度">
+            {preview ? <><div className="course-table" role="group" aria-label="课程学习进度">
               <div className="course-table-head">
                 <span>课程</span>
                 <span>学习进度</span>
@@ -787,7 +822,7 @@ export default function Workspace({
             <button className="all-courses" onClick={() => setExpanded(!expanded)}>
               {expanded ? '收起课程' : `查看全部 ${courses.length} 门课程`}
               <ChevronDown size={13} className={expanded ? 'rotate' : ''} />
-            </button>
+            </button></> : <LiveCourses resource={live.offerings} expanded={expanded} onExpand={() => setExpanded(!expanded)} onSelect={setOffering} />}
           </Module>
         </div>
 
@@ -852,7 +887,7 @@ export default function Workspace({
                 <PixelComputer happy />
                 <div className="greeting-bubble">
                   <h3 className="pixel-type">{chatCopy.welcome}</h3>
-                  <p>{academicSnapshot.assistantIntro}</p>
+                  <p>{preview ? academicSnapshot.assistantIntro : '可以查公开待办，或请课程助手核实具体事项。'}</p>
                 </div>
               </div>
               <div className="suggested-area">
@@ -861,7 +896,7 @@ export default function Workspace({
                   <h3>不妨，从这里开始</h3>
                 </div>
                 <div className="suggested-grid">
-                  {suggestedQuestions.map((q) => {
+                  {(preview ? suggestedQuestions : liveQuestions).map((q) => {
                     const Icon = questionIcons[q.icon as keyof typeof questionIcons]
                     return (
                       <button key={q.id} onClick={() => send(q.prompt)} disabled={replying}>
@@ -888,7 +923,7 @@ export default function Workspace({
                       {m.role === 'assistant' ? (
                         <>
                           <strong>Academic Assistant</strong>
-                          <span className="local-label">本地演示</span>
+                          <span className="local-label">{preview ? '本地演示' : '当前账号'}</span>
                         </>
                       ) : (
                         <>
@@ -922,16 +957,25 @@ export default function Workspace({
                 )}
               </div>
             )}
+            {!preview && chat.error && <Notice tone="error">{chat.error}</Notice>}
+            {!preview && chat.questions.map(q => <fieldset key={q.id} className="live-question">
+              <legend>待回答</legend><p className="live-body">{q.text}</p>
+              {q.options.length ? <div className="modal-actions">{q.options.map(op => <button key={op.id} type="button" className="button button-secondary" disabled={replying} onClick={() => chat.send(op.label, q.id)}>{op.label}</button>)}</div> : <form onSubmit={event => {event.preventDefault();if(chat.send(choiceText[q.id] || '', q.id))setChoiceText(old=>({...old,[q.id]:''}))}}>
+                <label>回答此问题<input value={choiceText[q.id] || ''} onChange={event => setChoiceText(old => ({...old,[q.id]:event.target.value}))} maxLength={2000} /></label>
+                <button type="submit" className="button button-primary" disabled={replying || !choiceText[q.id]?.trim()}>提交回答</button>
+              </form>}
+            </fieldset>)}
           </div>
           <div className="console-bottom">
             <div className="console-tools">
               <span>
                   <span className="status-square" /> 学习模式{' '}
-                  <span className="tool-divider">/</span> 本地演示
+                  <span className="tool-divider">/</span> {preview ? "本地演示" : "真实会话"}
               </span>
-              <button disabled={!messages.length} onClick={requestNewChat}>
+              {!preview && <button type="button" onClick={() => void chat.refresh()}>刷新记录</button>}
+              <button disabled={preview && !messages.length} onClick={requestNewChat}>
                 <Eraser size={13} />
-                清空并新建
+                {preview ? "清空并新建" : "新会话"}
               </button>
             </div>
             <form className="chat-composer" onSubmit={submit}>
@@ -943,7 +987,7 @@ export default function Workspace({
                 id="assistant-input"
                 rows={2}
                 maxLength={2000}
-                placeholder={chatCopy.placeholder}
+                placeholder={preview ? chatCopy.placeholder : "想查什么，或需要课程助手帮你做什么？"}
                 value={input}
                 onChange={(event) => setInput(event.target.value)}
                 onKeyDown={(event) => {
@@ -969,14 +1013,14 @@ export default function Workspace({
               </button>
             </form>
             <div className="composer-hint composer-hint-desktop">
-              <span>{chatCopy.note}</span>
+              <span>{preview ? chatCopy.note : chat.questions.length ? '新消息会放弃本会话当前待答问题。' : '当前账号 · 助手可能操作你的学业信息'}</span>
               <span>
                 <CornerDownLeft size={11} /> Enter 发送 <span className="tool-divider">·</span>{' '}
                 Shift + Enter 换行
               </span>
             </div>
             <div className="composer-hint composer-hint-mobile">
-              <span>{chatCopy.note}</span>
+              <span>{preview ? chatCopy.note : chat.questions.length ? '新消息会放弃本会话当前待答问题。' : '当前账号 · 助手可能操作你的学业信息'}</span>
               <span>点击发送按钮发送 · 回车换行</span>
             </div>
           </div>
@@ -991,11 +1035,11 @@ export default function Workspace({
                 className="pixel-type"
                 tabIndex={-1}
               >日程</h1>
-              <span className="local-page-badge">示例快照 · {academicSnapshot.date}</span>
+              <span className="local-page-badge">{preview ? `示例快照 · ${academicSnapshot.date}` : '当前账号'}</span>
             </header>
             <div className="schedule-composition">
             <div className="schedule-primary">
-            <div className="schedule-dates">
+            {preview ? <><div className="schedule-dates">
               {scheduleDays.map((day, i) => (
                 <button
                   key={day}
@@ -1018,25 +1062,25 @@ export default function Workspace({
                   <p>当前示例没有安排，给自己留一点自由时间。</p>
                 </div>
               )}
-            </Module>
+            </Module></> : <LiveTimeLine schedules={live.schedules} today={today} selected={selectedDay} onDay={setSelectedDay} onSelect={setSelectedSchedule} />}
             </div>
             <aside className="schedule-companion" aria-label="日程相关任务">
               <Module title="近期截止">
-                <p className="companion-note">按 {academicSnapshot.date} 示例快照排序</p>
+                {preview ? <><p className="companion-note">按 {academicSnapshot.date} 示例快照排序</p>
                 {courses.filter((item) => item.due).sort((a, b) => a.due.localeCompare(b.due)).map((item) => (
                   <button className="companion-task" key={item.id} onClick={() => setCourse(item)}>
                     <time dateTime={item.due}>{item.due.slice(5).replace('-', '/')}</time>
                     <span><strong>{item.task}</strong><small>{item.name}</small></span>
                     <ArrowUpRight size={15} aria-hidden="true" />
                   </button>
-                ))}
+                ))}</> : <LiveTodos resource={live.todos} onSelect={setSelectedTodo} />}
               </Module>
               <div className="schedule-assistant-note">
                 <PixelComputer happy />
                 <div><strong>课后怎么安排？</strong><p>让助手结合课程任务，帮你梳理学习顺序。</p><button className="text-button" onClick={openChat}>和助手聊聊 <ArrowUpRight size={14} /></button></div>
               </div>
             </aside>
-            <div className="schedule-notifications"><NotificationPreview /></div>
+            <div className="schedule-notifications">{preview ? <NotificationPreview /> : <LiveNotifications revision={revision} onSettled={refreshWorkspace} />}</div>
             </div>
             <button
               className="button button-secondary standalone-action"
@@ -1055,7 +1099,7 @@ export default function Workspace({
                 className="pixel-type"
                 tabIndex={-1}
               >我的</h1>
-              <span className="local-page-badge">示例快照 · {academicSnapshot.date}</span>
+              <span className="local-page-badge">{preview ? `示例快照 · ${academicSnapshot.date}` : '当前账号'}</span>
             </header>
             <div className="profile-composition">
             <div className="profile-identity-column">
@@ -1065,7 +1109,7 @@ export default function Workspace({
                 <h2>{name}</h2>
                 <p>
                   {preview ? '工作台体验访客' : user.username} <span>·</span>{' '}
-                  {academicSnapshot.semester}
+                  {term}
                 </p>
               </div>
               <span className="profile-status">
@@ -1081,7 +1125,7 @@ export default function Workspace({
               <div className="preference-row">
                 <div>
                   <strong>学业提醒</strong>
-                  <p>本次浏览时显示任务提醒，不会发送系统通知。</p>
+                  <p>{preview ? "本次浏览时显示任务提醒，不会发送系统通知。" : "只控制首页待办提示，不影响通知或定时任务。"}</p>
                 </div>
                 <button
                   className={`toggle ${reminders ? 'on' : ''}`}
@@ -1109,7 +1153,7 @@ export default function Workspace({
                 </button>
               </div>
             </Module>
-            <NotificationPreview />
+            {preview ? <NotificationPreview /> : <LiveNotifications revision={revision} onSettled={refreshWorkspace} />}
             {notice && <Notice tone="error">{notice}</Notice>}
             <button
               className="button button-secondary"
@@ -1152,14 +1196,17 @@ export default function Workspace({
         {!!messages.length && <span className="assistant-launcher-count">{messages.length}</span>}
       </button>
       {confirmClear && (
-        <Modal title="清空并新建对话？" closeHandleRef={clearModalRef} onClose={() => setConfirmClear(false)} descriptionId={clearDescriptionId} initialFocusRef={keepChatRef}>
-          <p id={clearDescriptionId} className="modal-description">当前消息将被清空，正在生成的回复也会停止。保留对话可继续查看现有消息。</p>
+        <Modal title={preview ? "清空并新建对话？" : "开启新会话？"} closeHandleRef={clearModalRef} onClose={() => setConfirmClear(false)} descriptionId={clearDescriptionId} initialFocusRef={keepChatRef}>
+          <p id={clearDescriptionId} className="modal-description">{preview ? "当前消息将被清空，正在生成的回复也会停止。保留对话可继续查看现有消息。" : "会切到一段新会话，不删除原有聊天；原任务已提交的操作不会撤销。"}</p>
           <div className="modal-actions">
             <button ref={keepChatRef} type="button" className="button button-secondary" onClick={() => clearModalRef.current?.close()}>保留对话</button>
-            <button type="button" className="button button-primary" onClick={() => clearModalRef.current?.close(clearChat)}>确认清空并新建</button>
+            <button type="button" className="button button-primary" onClick={() => clearModalRef.current?.close(clearChat)}>{preview ? "确认清空并新建" : "确认新会话"}</button>
           </div>
         </Modal>
       )}
+      {offering && <LiveOfferingDetail offering={offering} onClose={() => setOffering(undefined)} />}
+      {selectedTodo && <TodoDetail todo={selectedTodo} onClose={() => setSelectedTodo(undefined)} />}
+      {selectedSchedule && <ScheduleDetail item={selectedSchedule} onClose={() => setSelectedSchedule(undefined)} />}
       {course && (
         <Modal title={`${course.name} / ${course.task}`} closeHandleRef={courseModalRef} onClose={() => setCourse(undefined)} descriptionId={courseDescriptionId} initialFocusRef={courseActionRef}>
           <div className="course-detail">

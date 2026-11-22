@@ -1,0 +1,34 @@
+.live-body {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.live-detail-list {
+  display: grid;
+  gap: 0.5rem;
+}
+.live-question {
+  min-inline-size: 0;
+  margin: 0.75rem 0;
+  border: 1px solid currentColor;
+  border-radius: 8px;
+  padding: 0.75rem;
+}
+.live-question input {
+  width: 100%;
+  margin-block: 0.4rem;
+}
+.schedule-list .text-button {
+  text-align: start;
+  white-space: normal;
+}
+@media (max-width: 760px) {
+  .setup-header .header-right,
+  .setup-content .wizard-next {
+    flex-wrap: wrap;
+    min-width: 0;
+    max-width: 100%;
+  }
+  .setup-content .wizard-next {
+    gap: 8px;
+  }
+}

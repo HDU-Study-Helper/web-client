@@ -17,6 +17,8 @@ export interface Connection {
   id: string
   user_id: string
   source?: string
+  updated_at?: string
+  error_code?: string
   state: string
   enabled: boolean
 }

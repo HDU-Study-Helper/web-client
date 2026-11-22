@@ -32,6 +32,7 @@ export async function api<T>(
     body?: unknown
     signal?: AbortSignal
     sessionCheck?: boolean
+    timeoutMs?: number
   } = {},
 ): Promise<T> {
   const headers = new Headers({ Accept: 'application/json' })
@@ -54,7 +55,7 @@ export async function api<T>(
       credentials: 'same-origin',
       body: options.body === undefined ? undefined : JSON.stringify(options.body),
       signal: AbortSignal.any([
-        AbortSignal.timeout(120_000),
+        AbortSignal.timeout(options.timeoutMs ?? 120_000),
         ...(options.signal ? [options.signal] : []),
       ]),
     })

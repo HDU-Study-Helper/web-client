@@ -9,3 +9,4 @@
 @import './timetable.css' layer(timetable);
 @import './accessibility.css' layer(accessibility);
 @import './workspace-polish.css' layer(polish);
+@import './live-workspace.css' layer(polish);

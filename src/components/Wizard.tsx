@@ -22,7 +22,7 @@ import {
   ShieldCheck,
 } from 'lucide-react'
 import { activeConnection, api, connectionPath, dwsPath, errorMessage } from '../api'
-import { loadDraft, saveDraft, validatePeriodFields, validateTermFields, type ValidationError } from '../setup'
+import { loadDraft, saveDraft, schoolConnectionPreference, validatePeriodFields, validateTermFields, type ValidationError } from '../setup'
 import type { Connection, Group, ImportResult, SetupDraft, Source, User } from '../types'
 import AuthDialog from './AuthDialog'
 import GroupDialog from './GroupDialog'
@@ -140,7 +140,12 @@ export default function Wizard({
   const alive = useRef(true)
   const request = useRef(0)
   const content = useRef<HTMLDivElement>(null)
-  const school = activeConnection(connections, 'jwxt')
+  const [preferredSchool, setPreferredSchool] = useState(() => schoolConnectionPreference(user.id))
+  const schoolConnections = connections.filter(c => c.source === 'jwxt' && c.enabled && c.state === 'active')
+  const school = schoolConnections.find(c => c.id === preferredSchool) ?? schoolConnections.sort((a, b) =>
+    Number(Boolean(a.error_code)) - Number(Boolean(b.error_code)) ||
+    (Date.parse(b.updated_at || '') || 0) - (Date.parse(a.updated_at || '') || 0),
+  )[0]
   const dws = activeConnection(dwsConnections)
   const connected = platforms.filter((platform) =>
     platform.id === 'dws' ? !!dws : !!activeConnection(connections, platform.id),
@@ -227,7 +232,7 @@ export default function Wizard({
     setError('')
     setSuccess('')
     try {
-      await api<Connection>('/platforms/jwxt/login', {
+      const connection = await api<Connection>('/platforms/jwxt/login', {
         method: 'POST',
         body: {
           username: String(values.get('schoolUsername')).trim(),
@@ -235,6 +240,8 @@ export default function Wizard({
         },
       })
       if (!alive.current) return
+      schoolConnectionPreference(user.id, connection.id)
+      setPreferredSchool(connection.id)
       form.reset()
       await refresh()
       setSuccess('教务已连接，可以继续设置学期。')
@@ -321,6 +328,7 @@ export default function Wizard({
               管理后台 <ExternalLink size={13} />
             </a>
           )}
+          {!draft.completed && <button type="button" className="text-button" onClick={onComplete} disabled={busy}>打开工作台</button>}
           <button className="text-button help-button" onClick={() => setHelp(!help)}>
             需要帮助 <ArrowUpRight size={14} />
           </button>
@@ -907,6 +915,7 @@ export default function Wizard({
                   </Notice>
                 )}
                 {error && <Notice tone="error">{error}</Notice>}
+                {draft.step === 3 && <p className="optional-label">暂不导入也可以进入工作台查看已有课表；设置和草稿会保留。</p>}
                 <div className="wizard-footer">
                   <div>
                     {draft.step > 0 && (
@@ -940,6 +949,10 @@ export default function Wizard({
                         <ArrowRight size={17} />
                       </button>
                     ) : (
+                      <>
+                      <button type="button" className="button button-secondary" onClick={onComplete} disabled={busy}>
+                        暂不导入，进入工作台
+                      </button>
                       <button
                         className="button button-primary"
                         onClick={() => void finish()}
@@ -962,6 +975,7 @@ export default function Wizard({
                           </>
                         )}
                       </button>
+                      </>
                     )}
                   </div>
                 </div>

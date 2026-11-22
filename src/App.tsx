@@ -6,7 +6,7 @@ import Wizard from './components/Wizard'
 import { Brand, Spinner } from './components/UI'
 import Workspace from './components/Workspace'
 import { demoUser } from './data/mock'
-import { loadDraft } from './setup'
+import { loadDraft, preferWorkspace, rememberWorkspace } from './setup'
 
 export default function App() {
   const [preview, setPreview] = useState(
@@ -32,7 +32,7 @@ export default function App() {
       .then((value) => {
         if (!controller.signal.aborted) {
           setUser(value)
-          setWorkspace(loadDraft(value.id).completed)
+          setWorkspace(preferWorkspace(value.id) || loadDraft(value.id).completed)
         }
       })
       .catch((error) => {
@@ -77,16 +77,19 @@ export default function App() {
     )
   return user ? (
     workspace ? (
-      <Workspace user={user} onLogout={logout} onSettings={() => setWorkspace(false)} />
+      <Workspace key={user.id} user={user} onLogout={logout} onSettings={() => setWorkspace(false)} />
     ) : (
-      <Wizard key={user.id} user={user} onLogout={logout} onComplete={() => setWorkspace(true)} />
+      <Wizard key={user.id} user={user} onLogout={logout} onComplete={() => {
+        rememberWorkspace(user.id)
+        setWorkspace(true)
+      }} />
     )
   ) : (
     <Login
       message={message}
       onLogin={(value) => {
         setUser(value)
-        setWorkspace(loadDraft(value.id).completed)
+        setWorkspace(preferWorkspace(value.id) || loadDraft(value.id).completed)
         setMessage('')
       }}
       onPreview={() => {

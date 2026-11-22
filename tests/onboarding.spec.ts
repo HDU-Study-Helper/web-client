@@ -434,6 +434,42 @@ test('校历与重叠校验阻止错误导入，失败后保留草稿供重试',
   await expect(page.getByRole('alert')).toContainText('教务暂时不可用')
   await expect(page.getByText('时间表就绪，新学期见。')).toHaveCount(0)
   await expect(page.getByLabel('第 2 节开始时间', { exact: true })).toHaveValue('08:55')
+  await page.getByRole('button', { name: '暂不导入，进入工作台' }).click()
+  await expect(page.getByRole('heading', { name: '学业总览' })).toBeVisible()
+  await page.reload()
+  await expect(page.getByRole('heading', { name: '学业总览' })).toBeVisible()
+  const saved = await page.evaluate((id) => JSON.parse(localStorage.getItem(`haa:setup:v1:${id}`)!), user.id)
+  expect(saved.completed).toBe(false)
+  expect(saved.importResult).toBeUndefined()
+  expect(saved.periods[1].start).toBe('08:55')
+})
+
+test('重新登录教务后使用返回的新连接，不复用列表首个旧连接', async ({ page }) => {
+  await fixture(page, { authenticated: true, activeSchool: true })
+  await setDraft(page, { ...draft, step: 1 })
+  const newSchool = { ...school, id: 'jwxt-reconnected', updated_at: '2026-11-22T16:38:45+08:00' }
+  let loggedIn = false
+  let synced = false
+  await page.route('**/api/v1/platforms/jwxt/login', route => {
+    loggedIn = true
+    return route.fulfill({status:201, json:newSchool})
+  })
+  await page.route('**/api/v1/platforms/connections', route => route.fulfill({json:{items:loggedIn ? [{ ...school, updated_at: '2026-11-22T16:38:50+08:00', error_code: 'upstream_unavailable' }, newSchool] : [school]}}))
+  await page.route('**/api/v1/platforms/connections/jwxt-reconnected/sync', route => {
+    synced = true
+    return route.fulfill({json:{academic_year:2026,term:1,records:17,generated:196,skipped_practice:0,retired_modifications:[]}})
+  })
+  await page.goto('/')
+  await page.getByRole('button', {name:'需要重新登录？'}).click()
+  await page.getByLabel('学号 / 统一认证账号').fill('test-account')
+  await page.getByLabel('统一认证密码').fill('test-password')
+  await page.getByRole('button', {name:'连接教务处'}).click()
+  await expect(page.getByText('教务已连接，可以继续设置学期。')).toBeVisible()
+  await page.getByRole('button', {name:'下一步',exact:true}).click()
+  await page.getByRole('button', {name:'下一步',exact:true}).click()
+  await page.getByRole('button', {name:'完成设置并导入课表'}).click()
+  await expect(page.getByText(/已导入 17 条课表记录/)).toBeVisible()
+  expect(synced).toBe(true)
 })
 
 test('授权过期与会话失效可恢复，不假报成功', async ({ page }) => {
